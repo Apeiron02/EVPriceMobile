@@ -22,14 +22,20 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.buttonText}>Şarj Ücreti Hesaplama</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={() => navigation.navigate('MapScreen')}
+        >
           <Ionicons name="map" size={24} color="white" style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Şarj İstasyonları Haritası</Text>
+          <Text style={styles.buttonText}>Harita Sayfası</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={() => navigation.navigate('UserProfile')}
+        >
           <Ionicons name="car" size={24} color="white" style={styles.buttonIcon} />
-          <Text style={styles.buttonText}>Araç Bilgilerim</Text>
+          <Text style={styles.buttonText}>Kullanıcı Bilgilerim</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

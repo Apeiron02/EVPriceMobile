@@ -1,8 +1,10 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import HomeScreen from '../screens/HomeScreen';
+import HomeScreen from '../screens/homescreen';
 import ChargingCalculatorScreen from '../screens/ChargingCalculatorScreen';
+import UserProfileScreen from '../screens/UserProfileScreen';
+import MapScreen from '../screens/MapScreen'; // Add this import
 
 const Stack = createNativeStackNavigator();
 
@@ -30,7 +32,7 @@ const AppNavigator = () => {
           component={HomeScreen} 
           options={{ 
             title: 'Ana Sayfa',
-            headerShown: false, // Ana sayfada header'ı gizle
+            headerShown: false,
           }} 
         />
         <Stack.Screen 
@@ -38,7 +40,23 @@ const AppNavigator = () => {
           component={ChargingCalculatorScreen} 
           options={{ 
             title: 'Şarj Hesaplama',
-            headerShown: false, // Kendi custom header'ımızı kullanıyoruz
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="UserProfile" 
+          component={UserProfileScreen} 
+          options={{ 
+            title: 'Kullanıcı Bilgileri',
+            headerShown: false,
+          }} 
+        />
+        <Stack.Screen 
+          name="MapScreen" 
+          component={MapScreen} 
+          options={{ 
+            title: 'Harita',
+            headerShown: false,
           }} 
         />
       </Stack.Navigator>
