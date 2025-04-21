@@ -8,9 +8,12 @@ import {
   TouchableOpacity, 
   ScrollView,
   Modal,
-  FlatList
+  FlatList,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import authService from '../api/authService';
+import { reset } from '../navigation/navigationUtils';
 
 const UserProfileScreen = ({ navigation }) => {
   const [selectedCar, setSelectedCar] = useState('TOGG T10X V1 RWD Uzun Menzil');
@@ -75,6 +78,36 @@ const UserProfileScreen = ({ navigation }) => {
       duration: '54 dk'
     }
   ];
+  
+  const handleLogout = async () => {
+    Alert.alert(
+      "Çıkış Yap",
+      "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
+      [
+        {
+          text: "İptal",
+          style: "cancel"
+        },
+        {
+          text: "Çıkış Yap",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await authService.logout();
+              reset([{ name: 'Login' }]);
+            } catch (error) {
+              console.error('Logout Error:', error);
+              Alert.alert(
+                "Hata",
+                "Çıkış yapılırken bir hata oluştu. Lütfen tekrar deneyin.",
+                [{ text: "Tamam" }]
+              );
+            }
+          }
+        }
+      ]
+    );
+  };
   
   return (
     <SafeAreaView style={styles.container}>
@@ -177,7 +210,7 @@ const UserProfileScreen = ({ navigation }) => {
               borderRadius: 4,
               height: 48,
               backgroundColor: '#e53935'
-            }]}>
+            }]} onPress={handleLogout}>
               <Ionicons name="log-out-outline" size={22} color="white" style={styles.buttonIcon} />
               <Text style={[styles.buttonText, {fontSize: 16}]}>Çıkış Yap</Text>
             </TouchableOpacity>
