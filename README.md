@@ -26,12 +26,12 @@
       <strong>Harita Sayfası - 2</strong><br/>
       <img src="image/Harita_Sayfası_2.jpg" width="300"/>
     </td>
-  </tr>
-  <tr>
     <td align="center">
       <strong>Kullanıcı Sayfası - 1</strong><br/>
       <img src="image/Kullanıcı_Sayfası_1.jpg" width="300"/>
     </td>
+  </tr>
+  <tr>
     <td align="center">
       <strong>Kullanıcı Sayfası - 2</strong><br/>
       <img src="image/Kullanıcı_Sayfası_2.jpg" width="300"/>
