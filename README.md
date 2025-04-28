@@ -20,6 +20,8 @@
       <strong>Harita Sayfası - 1</strong><br/>
       <img src="image/Harita_Sayfası_1.jpg" width="300"/>
     </td>
+  </tr>
+  <tr> 
     <td align="center">
       <strong>Harita Sayfası - 2</strong><br/>
       <img src="image/Harita_Sayfası_2.jpg" width="300"/>
