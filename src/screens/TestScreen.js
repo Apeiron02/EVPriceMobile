@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, FlatList, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { updateApiUrl, getApiBaseUrl } from '../api/index';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TestScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
@@ -88,14 +89,40 @@ const TestScreen = ({ navigation, route }) => {
   };
 
   // IP adresini kaydet ve API URL'sini güncelle
-  const updateServerIp = () => {
-    // Tüm uygulama için API URL'sini güncelle
-    updateApiUrl(ipAddress);
-    Alert.alert(
-      "Başarılı",
-      `Sunucu adresi güncellendi: ${ipAddress}`,
-      [{ text: "Tamam" }]
-    );
+  const updateServerIp = async () => {
+    try {
+      // Mevcut IP'yi al ve karşılaştır
+      const currentBaseUrl = getApiBaseUrl();
+      const urlParts = currentBaseUrl.split('//');
+      let currentIp = '';
+      if (urlParts.length > 1) {
+        currentIp = urlParts[1].split(':')[0];
+      }
+      
+      // IP değişikliği varsa token'ları temizle
+      if (currentIp !== ipAddress) {
+        console.log('IP değişikliği tespit edildi. Oturum bilgileri temizleniyor.');
+        await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+        
+        // Son kullanılan IP'yi güncelle
+        await AsyncStorage.setItem('last_used_ip', ipAddress);
+      }
+      
+      // Tüm uygulama için API URL'sini güncelle
+      updateApiUrl(ipAddress);
+      Alert.alert(
+        "Başarılı",
+        `Sunucu adresi güncellendi: ${ipAddress}`,
+        [{ text: "Tamam" }]
+      );
+    } catch (error) {
+      console.error('Sunucu IP güncellenirken hata:', error);
+      Alert.alert(
+        "Hata",
+        `Sunucu adresi güncellenirken bir hata oluştu: ${error.message}`,
+        [{ text: "Tamam" }]
+      );
+    }
   };
   
   const testConnection = async () => {

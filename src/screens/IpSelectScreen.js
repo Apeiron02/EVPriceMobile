@@ -158,6 +158,13 @@ const IpSelectScreen = ({ navigation }) => {
     }
 
     try {
+      // IP değiştiğinde varolan token'ları temizle
+      const lastUsedIp = await AsyncStorage.getItem('last_used_ip');
+      if (lastUsedIp !== selectedIp) {
+        console.log('IP değişikliği tespit edildi. Oturum bilgileri temizleniyor.');
+        await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
+      }
+      
       // Seçilen IP'yi son kullanılan olarak kaydet
       await AsyncStorage.setItem('last_used_ip', selectedIp);
       

@@ -14,7 +14,12 @@ export const authService = {
       
       if (!response.data || !response.data.access) {
         console.error('Login response does not contain token:', response.data);
-        throw new Error('Token alınamadı');
+        if (response.data && response.data.detail) {
+          // Daha açıklayıcı hata mesajı
+          throw new Error(response.data.detail);
+        } else {
+          throw new Error('Token alınamadı');
+        }
       }
       
       console.log('Login successful, saving tokens');
