@@ -43,6 +43,8 @@ const UserProfileScreen = ({ navigation }) => {
   const [cars, setCars] = useState([]);
   const [carDetails, setCarDetails] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [routeHistory, setRouteHistory] = useState([]);
+  const [loadingRouteHistory, setLoadingRouteHistory] = useState(false);
   
   // Kullanıcı bilgileri için state tanımla
   const [userInfo, setUserInfo] = useState({
@@ -101,6 +103,7 @@ const UserProfileScreen = ({ navigation }) => {
       try {
         await fetchCars();
         await fetchUserInfo();
+        await fetchRouteHistory();
       } catch (error) {
         console.error('Veri yükleme hatası:', error);
       }
@@ -246,7 +249,7 @@ const UserProfileScreen = ({ navigation }) => {
         }
       }
     } catch (error) {
-      console.error('Araç detayları yüklenirken hata:', error);
+      consoles.error('Araç detayları yüklenirken hata:', error);
     }
   };
   
@@ -290,33 +293,27 @@ const UserProfileScreen = ({ navigation }) => {
     }
   };
   
-  // Örnek rota geçmişi
-  const routeHistory = [
-    {
-      id: 1,
-      date: '22/03/2023 13:52',
-      startLocation: 'İstanbul, Türkiye',
-      endLocation: 'Taşköprü Yeni İzmit Yalova Yolu NO:67/A, 77602 Taşköprü/Çiftlikköy/Yalova, Türkiye',
-      distance: '83.0 km',
-      duration: '82 dk'
-    },
-    {
-      id: 2,
-      date: '15/03/2023 14:30',
-      startLocation: 'Yenibosna Merkez, Bahçelievler/İstanbul, Türkiye',
-      endLocation: 'Ömerlı, 34799 Çekmeköy/İstanbul, Türkiye',
-      distance: '80.9 km',
-      duration: '66 dk'
-    },
-    {
-      id: 3,
-      date: '15/03/2023 14:27',
-      startLocation: 'Yenibosna Merkez, Bahçelievler/İstanbul, Türkiye',
-      endLocation: 'Beykoz/İstanbul, Türkiye',
-      distance: '60.6 km',
-      duration: '54 dk'
+  // Kullanıcının rota geçmişini getir
+  const fetchRouteHistory = async () => {
+    setLoadingRouteHistory(true);
+    try {
+      const routeHistoryData = await userService.getRouteHistory();
+      if (routeHistoryData && routeHistoryData.length > 0) {
+        console.log('Rota geçmişi başarıyla yüklendi:', routeHistoryData.length, 'rota.');
+        setRouteHistory(routeHistoryData);
+      } else {
+        console.log('Kullanıcının rota geçmişi bulunamadı veya boş.');
+        // Rota geçmişi boşsa örnek verileri gösterme
+        setRouteHistory([]);
+      }
+    } catch (error) {
+      console.error('Rota geçmişi yüklenirken hata:', error);
+      // Hata durumunda boş dizi ata
+      setRouteHistory([]);
+    } finally {
+      setLoadingRouteHistory(false);
     }
-  ];
+  };
   
   const handleLogout = async () => {
     Alert.alert(
@@ -473,26 +470,50 @@ const UserProfileScreen = ({ navigation }) => {
           <View style={styles.routeHistoryContainer}>
             <Text style={styles.sectionTitle}>Rota Geçmişi</Text>
             
-            {routeHistory.map((route) => (
-              <View key={route.id} style={styles.routeCard}>
-                <Text style={styles.routeDate}>{route.date}</Text>
-                
-                <View style={styles.routeDetail}>
-                  <Text style={styles.routeLabel}>Başlangıç:</Text>
-                  <Text style={styles.routeValue}>{route.startLocation}</Text>
-                </View>
-                
-                <View style={styles.routeDetail}>
-                  <Text style={styles.routeLabel}>Varış:</Text>
-                  <Text style={styles.routeValue}>{route.endLocation}</Text>
-                </View>
-                
-                <View style={styles.routeStats}>
-                  <Text style={styles.routeDistance}>{route.distance}</Text>
-                  <Text style={styles.routeDuration}>{route.duration}</Text>
-                </View>
+            {loadingRouteHistory ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#00b8d4" />
+                <Text style={styles.loadingText}>Rota geçmişi yükleniyor...</Text>
               </View>
-            ))}
+            ) : routeHistory.length > 0 ? (
+              routeHistory.map((route) => (
+                <View key={route.id} style={styles.routeCard}>
+                  <Text style={styles.routeDate}>
+                    {route.created_at ? new Date(route.created_at).toLocaleString('tr-TR', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) : 'Tarih bilgisi yok'}
+                  </Text>
+                  
+                  <View style={styles.routeDetail}>
+                    <Text style={styles.routeLabel}>Başlangıç:</Text>
+                    <Text style={styles.routeValue}>{route.start_address || 'Başlangıç konumu yok'}</Text>
+                  </View>
+                  
+                  <View style={styles.routeDetail}>
+                    <Text style={styles.routeLabel}>Varış:</Text>
+                    <Text style={styles.routeValue}>{route.end_address || 'Varış konumu yok'}</Text>
+                  </View>
+                  
+                  <View style={styles.routeStats}>
+                    <Text style={styles.routeDistance}>
+                      {route.total_distance ? `${route.total_distance.toFixed(1)} km` : '0 km'}
+                    </Text>
+                    <Text style={styles.routeDuration}>
+                      {route.total_duration ? `${Math.round(route.total_duration)} dk` : '0 dk'}
+                    </Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.emptyRouteHistory}>
+                <Ionicons name="map-outline" size={32} color="#a0a9bc" />
+                <Text style={styles.emptyListText}>Henüz rota geçmişi bulunmuyor.</Text>
+              </View>
+            )}
           </View>
           
           {/* Çıkış Yap butonu sayfanın en altına taşındı */}
@@ -905,6 +926,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  emptyRouteHistory: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
   },
 });
 

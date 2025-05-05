@@ -17,6 +17,7 @@ import LoginScreen from '../screens/LoginScreen';
 import IpSelectScreen from '../screens/IpSelectScreen';
 // Temporarily comment out the problematic import
 import TestScreen from '../screens/TestScreen';
+import SearchRouteScreen from '../screens/SearchRouteScreen';
 
 // Services
 import authService from '../api/authService';
@@ -121,6 +122,7 @@ const AppNavigator = () => {
             backgroundColor: '#1a2234',
           },
           headerShadowVisible: false,
+          animation: 'slide_from_right',
         }}
       >
         <Stack.Screen 
@@ -177,6 +179,7 @@ const AppNavigator = () => {
             headerShown: false,
           }} 
         />
+        <Stack.Screen name="SearchRoute" component={SearchRouteScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

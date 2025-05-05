@@ -10,15 +10,17 @@ import {
   Platform,
   SafeAreaView,
   StatusBar,
-  // Remove Slider from here
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
-import { Picker } from '@react-native-picker/picker';
 import { Ionicons } from '@expo/vector-icons';
-// Add the correct import for Slider
 import Slider from '@react-native-community/slider';
+import userService from '../api/userService';
+import carService from '../api/carService';
+import ElectricCarsScreen from './ElectricCarsScreen';
 
 const ChargingCalculatorScreen = ({ navigation }) => {
-  const [carModel, setCarModel] = useState('Tesla Model 3');
+  const [carModel, setCarModel] = useState('');
   const [batteryCapacity, setBatteryCapacity] = useState('60');
   const [currentChargeLevel, setCurrentChargeLevel] = useState(20);
   const [targetChargeLevel, setTargetChargeLevel] = useState(80);
@@ -26,6 +28,107 @@ const ChargingCalculatorScreen = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('sarjBilgileri');
   const [results, setResults] = useState(null);
   const [showResults, setShowResults] = useState(false);
+  const [carDetails, setCarDetails] = useState(null);
+  const [carLoading, setCarLoading] = useState(true);
+  const [availableCars, setAvailableCars] = useState([]);
+  const [showCarPicker, setShowCarPicker] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCarId, setSelectedCarId] = useState(null);
+
+  // Kullanıcının araç tercihini API'den al
+  useEffect(() => {
+    const loadUserCarPreference = async () => {
+      try {
+        setCarLoading(true);
+        
+        // Mevcut araçları yükle (modal için)
+        const carsData = await carService.getAllElectricCars();
+        if (carsData && carsData.results && carsData.results.length > 0) {
+          setAvailableCars(carsData.results);
+        }
+        
+        // Kullanıcının araç tercihini getir
+        const userCarPref = await userService.getUserCarPreference();
+        
+        if (userCarPref) {
+          console.log('Kullanıcı araç tercihi alındı:', JSON.stringify(userCarPref));
+          
+          // Farklı API yanıt yapılarına göre araç ID'sini bul
+          let selectedCarId = null;
+          
+          if (userCarPref.selected_car_id) {
+            selectedCarId = userCarPref.selected_car_id;
+          } else if (userCarPref.selected_car && userCarPref.selected_car.id) {
+            selectedCarId = userCarPref.selected_car.id;
+          } else if (userCarPref.arac_id) {
+            selectedCarId = userCarPref.arac_id;
+          }
+          
+          if (selectedCarId) {
+            // Seçilen araç ID'sini state'e kaydet
+            setSelectedCarId(selectedCarId);
+            
+            // Araç detaylarını getir
+            const carData = await carService.getElectricCarById(selectedCarId);
+            setCarDetails(carData);
+            
+            // Araç adını ve batarya kapasitesini ayarla
+            if (carData && carData.car_name) {
+              setCarModel(carData.car_name);
+              setBatteryCapacity(carData.kwh.toString());
+              console.log('Kullanıcının tercih ettiği araç yüklendi:', carData.car_name);
+            }
+          } else if (carsData && carsData.results && carsData.results.length > 0) {
+            // Eğer kullanıcı tercihi yoksa ilk aracı seç
+            const firstCar = carsData.results[0];
+            setCarModel(firstCar.car_name);
+            setBatteryCapacity(firstCar.kwh.toString());
+          }
+        } else if (carsData && carsData.results && carsData.results.length > 0) {
+          // Kullanıcı tercihi yoksa ilk aracı seç
+          const firstCar = carsData.results[0];
+          setCarModel(firstCar.car_name);
+          setBatteryCapacity(firstCar.kwh.toString());
+        }
+      } catch (error) {
+        console.error('Araç tercihi yüklenirken hata:', error);
+      } finally {
+        setCarLoading(false);
+      }
+    };
+    
+    loadUserCarPreference();
+  }, []);
+
+  // Araç seçme işlevi
+  const handleCarSelect = (car) => {
+    if (!car) return;
+    
+    setShowCarPicker(false);
+    
+    setSelectedCarId(car.id);
+    setCarModel(car.car_name);
+    
+    if (car.kwh) {
+      setBatteryCapacity(car.kwh.toString());
+    }
+    
+    setCarDetails(car);
+    
+    // Seçilen aracı kullanıcı tercihi olarak API'ye kaydet
+    userService.setUserCarPreference(car.id)
+      .then(() => {
+        console.log('Araç tercihi başarıyla kaydedildi');
+      })
+      .catch(error => {
+        console.error('Araç tercihi kaydedilirken hata:', error);
+      });
+  };
+  
+  // Arama alanını temizle
+  const clearSearch = () => {
+    setSearchQuery('');
+  };
 
   // Function to round to nearest 5%
   const roundToFive = (value) => {
@@ -102,32 +205,38 @@ const ChargingCalculatorScreen = ({ navigation }) => {
           <View style={styles.formContainer}>
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Araç Modeli:</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={carModel}
-                  onValueChange={(itemValue) => setCarModel(itemValue)}
-                  style={styles.picker}
-                  dropdownIconColor="#00b8d4"
+              {carLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#00b8d4" />
+                  <Text style={styles.loadingText}>Araç bilgileri yükleniyor...</Text>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.customPickerContainer}
+                  onPress={() => setShowCarPicker(true)}
                 >
-                  <Picker.Item label="Tesla Model 3" value="Tesla Model 3" />
-                  <Picker.Item label="Tesla Model Y" value="Tesla Model Y" />
-                  <Picker.Item label="Volkswagen ID.4" value="Volkswagen ID.4" />
-                  <Picker.Item label="Hyundai Kona Electric" value="Hyundai Kona Electric" />
-                  <Picker.Item label="Kia EV6" value="Kia EV6" />
-                </Picker>
-              </View>
+                  <Text style={styles.customPickerText}>{carModel || 'Lütfen araç seçin'}</Text>
+                  <Ionicons name="chevron-down" size={20} color="#00b8d4" />
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Batarya Kapasitesi (kWh):</Text>
-              <TextInput
-                style={styles.input}
-                value={batteryCapacity}
-                onChangeText={setBatteryCapacity}
-                keyboardType="numeric"
-                placeholder="60"
-                placeholderTextColor="#6c7a94"
-              />
+              {carLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#00b8d4" />
+                </View>
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  value={batteryCapacity}
+                  onChangeText={setBatteryCapacity}
+                  keyboardType="numeric"
+                  placeholder="60"
+                  placeholderTextColor="#6c7a94"
+                />
+              )}
             </View>
 
             <View style={styles.inputContainer}>
@@ -251,6 +360,63 @@ const ChargingCalculatorScreen = ({ navigation }) => {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      
+      {/* Araç Seçim Modalı */}
+      <Modal
+        visible={showCarPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCarPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Araç Seçin ({availableCars.length} araç)</Text>
+              <TouchableOpacity onPress={() => setShowCarPicker(false)}>
+                <Ionicons name="close" size={24} color="#00b8d4" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Arama Kutusu */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#a0a9bc" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Marka veya model ara..."
+                placeholderTextColor="#a0a9bc"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={clearSearch}>
+                  <Ionicons name="close-circle" size={20} color="#a0a9bc" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            
+            {/* ElectricCarsScreen Bileşeni */}
+            <View style={styles.carsListContainer}>
+              {carLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#00b8d4" />
+                  <Text style={styles.loadingText}>Araçlar yükleniyor...</Text>
+                </View>
+              ) : (
+                <ElectricCarsScreen
+                  cars={searchQuery ? 
+                    availableCars.filter(car => 
+                      car.car_name.toLowerCase().includes(searchQuery.toLowerCase())
+                    ) : availableCars
+                  }
+                  selectedCarId={selectedCarId}
+                  onCarSelect={handleCarSelect}
+                  isModal={true}
+                />
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -344,17 +510,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#ffffff',
-  },
-  pickerContainer: {
-    backgroundColor: '#2d3446',
-    borderWidth: 1,
-    borderColor: '#3d4559',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 50,
     color: '#ffffff',
   },
   sliderValue: {
@@ -476,6 +631,90 @@ const styles = StyleSheet.create({
   progressLabelEnd: {
     color: '#a0a9bc',
     fontSize: 14,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2d3446',
+    borderRadius: 8,
+    padding: 15,
+    height: 50,
+  },
+  loadingText: {
+    color: '#a0a9bc',
+    fontSize: 14,
+    marginLeft: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#1a2234',
+    borderRadius: 8,
+    width: '90%',
+    maxHeight: '80%',
+    borderWidth: 1,
+    borderColor: '#3d4559',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3d4559',
+  },
+  modalTitle: {
+    color: '#00b8d4',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2d3446',
+    borderRadius: 8,
+    margin: 10,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  customPickerContainer: {
+    backgroundColor: '#2d3446',
+    borderWidth: 1,
+    borderColor: '#3d4559',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  customPickerText: {
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  carsListContainer: {
+    flex: 1,
+    margin: 10,
+    marginTop: 0,
+    borderRadius: 8,
+    overflow: 'hidden',
+    maxHeight: '80%',
+    width: '100%',
+    padding: 10, // Eklenen padding
+    height: 'auto', // Yükseklik otomatik ayarlandı
   },
 });
 

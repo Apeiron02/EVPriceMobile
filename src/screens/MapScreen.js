@@ -17,15 +17,16 @@ import {
   Animated,
   Platform,
 } from "react-native"
-import MapView, { Marker, Callout, PROVIDER_DEFAULT } from "react-native-maps"
+import MapView, { Marker, Callout, PROVIDER_DEFAULT, Polyline } from "react-native-maps"
 import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons"
 import api from "../api"
 import * as Location from 'expo-location'
+import { getRouteInfo } from '../api/map'
 
 const { width, height } = Dimensions.get("window")
 const ANIMATION_DURATION = 300
 
-const MapScreen = ({ navigation }) => {
+const MapScreen = ({ navigation, route }) => {
   const [searchText, setSearchText] = useState("")
   const mapRef = useRef(null)
   const [chargingStations, setChargingStations] = useState([])
@@ -36,6 +37,7 @@ const MapScreen = ({ navigation }) => {
   const [lastSearchedLocation, setLastSearchedLocation] = useState(null)
   const [mapType, setMapType] = useState("standard")
   const [showLocationInfo, setShowLocationInfo] = useState(false)
+  const [routeCoordinates, setRouteCoordinates] = useState([])
 
   // Animation values
   const locationInfoOpacity = useRef(new Animated.Value(0)).current
@@ -87,6 +89,24 @@ const MapScreen = ({ navigation }) => {
       useNativeDriver: true,
     }).start()
   }, [showStationDetails])
+
+  useEffect(() => {
+    if (route?.params?.origin && route?.params?.destination) {
+      const { origin, destination } = route.params;
+      fetchRouteInfo(origin, destination);
+      
+      // Haritayı rota başlangıç ve bitiş noktalarını gösterecek şekilde ayarla
+      const coordinates = [
+        { latitude: origin.latitude, longitude: origin.longitude },
+        { latitude: destination.latitude, longitude: destination.longitude }
+      ];
+      
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+        animated: true
+      });
+    }
+  }, [route?.params]);
 
   // İki konum arasındaki uzaklığı hesaplama (Haversine formülü)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -324,6 +344,24 @@ const MapScreen = ({ navigation }) => {
     })
   }
 
+  const fetchRouteInfo = async (origin, destination) => {
+    try {
+      const routeData = await getRouteInfo(
+        origin.latitude, 
+        origin.longitude, 
+        destination.latitude, 
+        destination.longitude
+      );
+      
+      if (routeData && routeData.coordinates) {
+        setRouteCoordinates(routeData.coordinates);
+      }
+    } catch (error) {
+      console.error('Rota bilgisi alınırken hata:', error);
+      Alert.alert('Hata', 'Rota bilgisi alınamadı. Lütfen tekrar deneyin.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
@@ -342,6 +380,29 @@ const MapScreen = ({ navigation }) => {
           showsCompass={false}
           showsScale={true}
         >
+          {/* Başlangıç ve bitiş noktaları için marker'lar */}
+          {route?.params?.origin && (
+            <Marker
+              coordinate={{
+                latitude: route.params.origin.latitude,
+                longitude: route.params.origin.longitude
+              }}
+              title="Başlangıç"
+              description={route.params.origin.name}
+            />
+          )}
+          
+          {route?.params?.destination && (
+            <Marker
+              coordinate={{
+                latitude: route.params.destination.latitude,
+                longitude: route.params.destination.longitude
+              }}
+              title="Varış"
+              description={route.params.destination.name}
+            />
+          )}
+
           {/* Seçilen konum marker'ı */}
           {selectedLocation && (
             <Marker coordinate={selectedLocation} title="Seçilen Konum" pinColor="#3498db">
@@ -382,28 +443,36 @@ const MapScreen = ({ navigation }) => {
               </Callout>
             </Marker>
           ))}
+
+          {/* Rota çizgisi */}
+          {routeCoordinates.length > 0 && (
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeWidth={4}
+              strokeColor="#00b8d4"
+            />
+          )}
         </MapView>
 
-        {/* Arama Çubuğu */}
+        {/* Arama Çubuğu - Yeniden Düzenlenmiş */}
         <View style={styles.searchContainer}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={22} color="#333" />
           </TouchableOpacity>
-          <View style={styles.searchBar}>
+          <TouchableOpacity 
+            style={styles.searchBar}
+            onPress={() => navigation.navigate('SearchRoute')}
+          >
             <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Konum veya şarj istasyonu ara"
-              value={searchText}
-              onChangeText={setSearchText}
-              placeholderTextColor="#999"
-            />
+            <Text style={styles.searchInput}>
+              {searchText || "Konum veya şarj istasyonu ara"}
+            </Text>
             {searchText.length > 0 && (
               <TouchableOpacity onPress={() => setSearchText("")}>
                 <Ionicons name="close-circle" size={20} color="#666" />
               </TouchableOpacity>
             )}
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Harita Kontrolleri */}
@@ -526,7 +595,7 @@ const MapScreen = ({ navigation }) => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Alt Navigasyon */}
+      {/* Alt Navigasyon - Konum butonu kaldırıldı */}
       <Animated.View style={[styles.bottomNav, { height: bottomNavHeight }]}>
         <View style={styles.bottomNavContent}>
           <TouchableOpacity style={styles.navButton}>
@@ -534,10 +603,7 @@ const MapScreen = ({ navigation }) => {
             <Text style={[styles.navText, { color: "#00b8d4" }]}>Keşfet</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.navButton} onPress={goToUserLocation}>
-            <Ionicons name="location" size={24} color="#666" />
-            <Text style={styles.navText}>Konumum</Text>
-          </TouchableOpacity>
+          {/* Konum butonu kaldırıldı */}
 
           <TouchableOpacity style={styles.navButton}>
             <FontAwesome5 name="charging-station" size={22} color="#666" />
