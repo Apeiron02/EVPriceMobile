@@ -131,7 +131,7 @@ const ElectricCarsScreen = ({
         data={cars}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, isModal && styles.modalListContent]}
         ListEmptyComponent={() => (
           <View style={styles.emptyList}>
             <Ionicons name="car-outline" size={48} color="#a0a9bc" />
@@ -154,6 +154,10 @@ const styles = StyleSheet.create({
   modalContainer: {
     padding: 0,
     backgroundColor: 'transparent',
+    flex: 1,
+  },
+  modalListContent: {
+    paddingBottom: 0,
   },
   center: {
     flex: 1,
