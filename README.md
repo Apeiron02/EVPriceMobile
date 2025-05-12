@@ -17,6 +17,10 @@
       <img src="image/Sarj_Maliyet_Sayfası_2.jpg" width="300"/>
     </td>
     <td align="center">
+      <strong>Şarj Maliyet Sayfası - 3</strong><br/>
+      <img src="image/Sarj_Maliyet_Sayfası_3.jpg" width="300"/>
+    </td>
+    <td align="center">
       <strong>Harita Sayfası - 1</strong><br/>
       <img src="image/Harita_Sayfası_1.jpg" width="300"/>
     </td>
@@ -25,6 +29,10 @@
     <td align="center">
       <strong>Harita Sayfası - 2</strong><br/>
       <img src="image/Harita_Sayfası_2.jpg" width="300"/>
+    </td>
+    <td align="center">
+      <strong>Harita Sayfası - 3</strong><br/>
+      <img src="image/Harita_Sayfası_3.jpg" width="300"/>
     </td>
     <td align="center">
       <strong>Kullanıcı Sayfası - 1</strong><br/>
