@@ -62,5 +62,11 @@
     </td>
   </tr>
   <tr>
+    <td align="center">
+      <strong>Kullanıcı Sayfası - 2</strong><br/>
+      <img src="image/Kullanıcı_Sayfası_2.jpg" width="300"/>
+    </td>
+  </tr>
+  <tr>
   </tr>
 </table>
