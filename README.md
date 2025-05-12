@@ -1,5 +1,7 @@
 # EVPriceMobile
 
+Aşağıda uygulamaya ait ekran görüntüleri bulunmaktadır:
+
 <table>
   <tr>
     <td align="center">
@@ -7,15 +9,21 @@
       <img src="image/Anasayfa.jpg" width="300"/>
     </td>
     <td align="center">
-      <strong>Şarj Maliyet Sayfası - 1</strong><br/>
-      <img src="image/Sarj_Maliyet_Sayfası_1.jpg" width="300"/>
+      <strong>Rota Bilgisi Sayfası</strong><br/>
+      <img src="image/Rota_Bilgisi_Sayfası.jpg" width="300"/>
     </td>
   </tr>
   <tr>
     <td align="center">
+      <strong>Şarj Maliyet Sayfası - 1</strong><br/>
+      <img src="image/Sarj_Maliyet_Sayfası_1.jpg" width="300"/>
+    </td>
+    <td align="center">
       <strong>Şarj Maliyet Sayfası - 2</strong><br/>
       <img src="image/Sarj_Maliyet_Sayfası_2.jpg" width="300"/>
     </td>
+  </tr>
+  <tr>
     <td align="center">
       <strong>Şarj Maliyet Sayfası - 3</strong><br/>
       <img src="image/Sarj_Maliyet_Sayfası_3.jpg" width="300"/>
@@ -25,7 +33,7 @@
       <img src="image/Harita_Sayfası_1.jpg" width="300"/>
     </td>
   </tr>
-  <tr> 
+  <tr>
     <td align="center">
       <strong>Harita Sayfası - 2</strong><br/>
       <img src="image/Harita_Sayfası_2.jpg" width="300"/>
@@ -33,6 +41,12 @@
     <td align="center">
       <strong>Harita Sayfası - 3</strong><br/>
       <img src="image/Harita_Sayfası_3.jpg" width="300"/>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <strong>Harita Sayfası - 4</strong><br/>
+      <img src="image/Harita_Sayfası_4.jpg" width="300"/>
     </td>
     <td align="center">
       <strong>Kullanıcı Sayfası - 1</strong><br/>
