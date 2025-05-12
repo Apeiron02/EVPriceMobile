@@ -21,7 +21,7 @@ import MapView, { Marker, Callout, PROVIDER_DEFAULT, Polyline } from "react-nati
 import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons"
 import api from "../api"
 import * as Location from 'expo-location'
-import { getRouteInfo } from '../api/map'
+import { getRouteInfoPOST } from '../api/map'
 
 const { width, height } = Dimensions.get("window")
 const ANIMATION_DURATION = 300
@@ -92,19 +92,23 @@ const MapScreen = ({ navigation, route }) => {
 
   useEffect(() => {
     if (route?.params?.origin && route?.params?.destination) {
-      const { origin, destination } = route.params;
-      fetchRouteInfo(origin, destination);
+      const { origin, destination, routeCoordinates } = route.params;
       
-      // Haritayı rota başlangıç ve bitiş noktalarını gösterecek şekilde ayarla
-      const coordinates = [
-        { latitude: origin.latitude, longitude: origin.longitude },
-        { latitude: destination.latitude, longitude: destination.longitude }
-      ];
-      
-      mapRef.current.fitToCoordinates(coordinates, {
-        edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-        animated: true
-      });
+      // Eğer rota bilgileri hazır olarak geldiyse, doğrudan göster
+      if (routeCoordinates && routeCoordinates.length > 0) {
+        console.log('Hazır rota bilgileri kullanılıyor:', routeCoordinates.length);
+        setRouteCoordinates(routeCoordinates);
+        
+        // Haritayı rota başlangıç ve bitiş noktalarını gösterecek şekilde ayarla
+        mapRef.current.fitToCoordinates(routeCoordinates, {
+          edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+          animated: true
+        });
+      } else {
+        // Rota bilgisi gelmemişse, API'den al
+        console.log('Rota bilgileri API\'den alınacak');
+        fetchRouteInfo(origin, destination);
+      }
     }
   }, [route?.params]);
 
@@ -346,20 +350,192 @@ const MapScreen = ({ navigation, route }) => {
 
   const fetchRouteInfo = async (origin, destination) => {
     try {
-      const routeData = await getRouteInfo(
+      setIsLoading(true);
+      console.log('Rota bilgisi isteniyor:', origin, destination);
+      
+      // Koordinatlar kontrol ediliyor
+      if (!origin.latitude || !destination.latitude) {
+        console.error('Geçersiz koordinatlar');
+        Alert.alert('Hata', 'Rota oluşturmak için geçerli koordinatlar gereklidir.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // POST isteği kullanarak rota bilgisini al
+      const routeData = await getRouteInfoPOST(
         origin.latitude, 
         origin.longitude, 
         destination.latitude, 
-        destination.longitude
+        destination.longitude,
+        'driving'
       );
       
-      if (routeData && routeData.coordinates) {
+      console.log('Rota verisi alındı');
+      
+      // Doğrudan coordinates alanından verileri al - bu bizim polyline decoder'dan gelir
+      if (routeData && routeData.coordinates && routeData.coordinates.length > 0) {
+        console.log(`${routeData.coordinates.length} detaylı rota koordinat noktası alındı`);
         setRouteCoordinates(routeData.coordinates);
+        
+        // Rota bilgilerine göre haritayı ayarla
+        mapRef.current.fitToCoordinates(routeData.coordinates, {
+          edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+          animated: true
+        });
+        return;
+      }
+      
+      // Eğer bizim decoder sonuçları yoksa, standart işlem yapılır
+      if (routeData && routeData.routes && routeData.routes.length > 0) {
+        // API'den gelen rota verilerini koordinat dizisine dönüştür
+        const route = routeData.routes[0];
+        console.log('Standart rota işlemi yapılıyor');
+        
+        if (route.overview_polyline && route.overview_polyline.points) {
+          // Rota genel bakış polyline değerini decode et
+          try {
+            const decodedCoordinates = decodePolyline(route.overview_polyline.points);
+            if (decodedCoordinates && decodedCoordinates.length > 0) {
+              console.log(`Overview polyline decodlandı: ${decodedCoordinates.length} nokta`);
+              setRouteCoordinates(decodedCoordinates);
+              
+              // Rota bilgilerine göre haritayı ayarla
+              mapRef.current.fitToCoordinates(decodedCoordinates, {
+                edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+                animated: true
+              });
+              return;
+            }
+          } catch (decodeError) {
+            console.error('Polyline decode hatası:', decodeError);
+          }
+        }
+        
+        // Eğer overview_polyline yoksa veya decode edilemiyorsa, adım adım rota bilgilerini kullan
+        if (route.legs && route.legs.length > 0) {
+          console.log('Rota bacak bilgilerinden koordinatlar oluşturuluyor');
+          const pathCoordinates = [];
+          
+          route.legs.forEach(leg => {
+            if (leg.steps) {
+              leg.steps.forEach(step => {
+                // Adımların polyline verilerini decode et
+                if (step.polyline && step.polyline.points) {
+                  try {
+                    const stepPoints = decodePolyline(step.polyline.points);
+                    if (stepPoints && stepPoints.length > 0) {
+                      pathCoordinates.push(...stepPoints);
+                    } else {
+                      // Polyline decode edilemezse, adımın başlangıç ve bitiş noktalarını ekle
+                      pathCoordinates.push({
+                        latitude: step.start_location.lat,
+                        longitude: step.start_location.lng
+                      });
+                      pathCoordinates.push({
+                        latitude: step.end_location.lat,
+                        longitude: step.end_location.lng
+                      });
+                    }
+                  } catch (stepDecodeError) {
+                    console.error('Adım polyline decode hatası:', stepDecodeError);
+                    // Hata durumunda başlangıç ve bitiş noktalarını ekle
+                    pathCoordinates.push({
+                      latitude: step.start_location.lat,
+                      longitude: step.start_location.lng
+                    });
+                    pathCoordinates.push({
+                      latitude: step.end_location.lat,
+                      longitude: step.end_location.lng
+                    });
+                  }
+                } else {
+                  // Polyline yoksa, adımın başlangıç ve bitiş noktalarını ekle
+                  pathCoordinates.push({
+                    latitude: step.start_location.lat,
+                    longitude: step.start_location.lng
+                  });
+                  pathCoordinates.push({
+                    latitude: step.end_location.lat,
+                    longitude: step.end_location.lng
+                  });
+                }
+              });
+            }
+          });
+          
+          // Eğer koordinatlar başarıyla oluşturulduysa, haritada göster
+          if (pathCoordinates.length > 0) {
+            console.log(`${pathCoordinates.length} koordinat noktası işlendi`);
+            setRouteCoordinates(pathCoordinates);
+            
+            // Rota bilgilerine göre haritayı ayarla
+            mapRef.current.fitToCoordinates(pathCoordinates, {
+              edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
+              animated: true
+            });
+            return;
+          }
+        }
+        
+        console.warn('Rota koordinatları oluşturulamadı');
+        Alert.alert('Uyarı', 'Bu rotada yol bilgisi bulunamadı. Lütfen geçerli adresler girdiğinizden emin olun.');
+      } else {
+        console.warn('Rota verisi bulunamadı');
+        Alert.alert('Uyarı', 'Bu rotada yol bilgisi bulunamadı. Lütfen geçerli adresler girdiğinizden emin olun.');
       }
     } catch (error) {
       console.error('Rota bilgisi alınırken hata:', error);
-      Alert.alert('Hata', 'Rota bilgisi alınamadı. Lütfen tekrar deneyin.');
+      Alert.alert('Hata', error.message || 'Rota bilgisi alınamadı. Lütfen tekrar deneyin.');
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  // Google polyline decoder fonksiyonu
+  const decodePolyline = (encoded) => {
+    if (!encoded || encoded.length === 0) {
+      return [];
+    }
+    
+    const poly = [];
+    let index = 0;
+    const len = encoded.length;
+    let lat = 0;
+    let lng = 0;
+
+    while (index < len) {
+      let b;
+      let shift = 0;
+      let result = 0;
+      
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      
+      const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      
+      do {
+        b = encoded.charCodeAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      
+      const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      poly.push({
+        latitude: lat * 1e-5,
+        longitude: lng * 1e-5
+      });
+    }
+    
+    return poly;
   };
 
   return (
@@ -389,7 +565,12 @@ const MapScreen = ({ navigation, route }) => {
               }}
               title="Başlangıç"
               description={route.params.origin.name}
-            />
+              pinColor="#2ecc71" // Yeşil pin
+            >
+              <View style={[styles.customMarker, { backgroundColor: '#2ecc71' }]}>
+                <Ionicons name="flag" size={16} color="#fff" />
+              </View>
+            </Marker>
           )}
           
           {route?.params?.destination && (
@@ -400,7 +581,12 @@ const MapScreen = ({ navigation, route }) => {
               }}
               title="Varış"
               description={route.params.destination.name}
-            />
+              pinColor="#e74c3c" // Kırmızı pin
+            >
+              <View style={[styles.customMarker, { backgroundColor: '#e74c3c' }]}>
+                <Ionicons name="location" size={16} color="#fff" />
+              </View>
+            </Marker>
           )}
 
           {/* Seçilen konum marker'ı */}
@@ -450,6 +636,9 @@ const MapScreen = ({ navigation, route }) => {
               coordinates={routeCoordinates}
               strokeWidth={4}
               strokeColor="#00b8d4"
+              lineDashPattern={[0]}
+              lineCap="round"
+              lineJoin="round"
             />
           )}
         </MapView>
@@ -998,6 +1187,21 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 14,
+  },
+  customMarker: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#00b8d4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
 })
 
