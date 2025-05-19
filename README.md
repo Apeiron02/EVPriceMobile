@@ -53,16 +53,29 @@
       <img src="image/Harita_Sayfası_4.jpg" width="300"/>
     </td>
     <td align="center">
-      <strong>Kullanıcı Sayfası - 1</strong><br/>
-      <img src="image/Kullanıcı_Sayfası_1.jpg" width="300"/>
+      <strong>Harita Sayfası - 5</strong><br/>
+      <img src="image/Harita_Sayfası_5.jpg" width="300"/>
     </td>
   </tr>
   <tr>
+      <td align="center">
+      <strong>Harita Sayfası - 6</strong><br/>
+      <img src="image/Harita_Sayfası_6.jpg" width="300"/>
+    </td>
+    <td align="center">
+      <strong>Kullanıcı Sayfası - 1</strong><br/>
+      <img src="image/Kullanıcı_Sayfası_1.jpg" width="300"/>
+    </td>
     <td align="center">
       <strong>Kullanıcı Sayfası - 2</strong><br/>
       <img src="image/Kullanıcı_Sayfası_2.jpg" width="300"/>
     </td>
   </tr>
+  <tr>
+      <td align="center">
+      <strong>Rota_Bilgisi_Sayfası</strong><br/>
+      <img src="image/Rota_Bilgisi_Sayfası.jpg" width="300"/>
+    </td>
   <tr>
   </tr>
 </table>
