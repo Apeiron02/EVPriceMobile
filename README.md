@@ -73,8 +73,8 @@
   </tr>
   <tr>
       <td align="center">
-      <strong>Rota_Bilgisi_Sayfası</strong><br/>
-      <img src="image/Rota_Bilgisi_Sayfası.jpg" width="300"/>
+      <strong>Rota_Detayları_Sayfası</strong><br/>
+      <img src="image/Rota_Detayları_Sayfası.jpg" width="300"/>
     </td>
   <tr>
   </tr>
