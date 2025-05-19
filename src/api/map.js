@@ -314,3 +314,36 @@ export const getReadableErrorMessage = (error) => {
   // Genel hata mesajı
   return error.message || "Bir hata oluştu, lütfen tekrar deneyin."
 }
+
+// Rota üzerindeki şarj istasyonlarını getiren fonksiyon
+export const getRouteChargingStations = async (originLat, originLng, destinationLat, destinationLng) => {
+  try {
+    console.log("Rota üzerindeki şarj istasyonları için istek yapılıyor");
+    
+    // Rota noktalarını oluştur
+    const route_points = [
+      {
+        lat: originLat,
+        lng: originLng
+      },
+      {
+        lat: destinationLat,
+        lng: destinationLng
+      }
+    ];
+    
+    const response = await api.post("rota-sarj-istasyonlari/", {
+      route_points: route_points
+    });
+
+    if (response.data && response.data.stations) {
+      console.log(`${response.data.stations.length} şarj istasyonu bulundu`);
+      return response.data.stations;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error("Rota şarj istasyonları alınırken hata:", error.response?.data || error);
+    throw error;
+  }
+};

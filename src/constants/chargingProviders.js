@@ -1,32 +1,38 @@
 // Şarj sağlayıcıları sabit değerleri
 // Not: Uygulamada gerçek logoları kullanmak için gerekli logoları assets klasörüne ekleyin
 
+// Logo importları
+import zesLogo from '../assets/provider-logos/zes.png';
+import voltrunLogo from '../assets/provider-logos/voltrun.png';
+import esarjLogo from '../assets/provider-logos/esarj.png';
+import trugoLogo from '../assets/provider-logos/trugo.png';
+
 export const CHARGING_PROVIDERS = [
   {
     id: 'zes',
     name: 'ZES',
-    logo: null, // Logo yerine null kullanıyoruz
+    logo: zesLogo,
     primaryColor: '#1190CB', // ZES mavi
     secondaryColor: '#13C6FF',
   },
   {
     id: 'voltrun',
     name: 'Voltrun',
-    logo: null, // Logo yerine null kullanıyoruz
+    logo: voltrunLogo,
     primaryColor: '#00AD4E', // Voltrun yeşil
     secondaryColor: '#4AD286',
   },
   {
     id: 'esarj',
     name: 'E-Şarj',
-    logo: null, // Logo yerine null kullanıyoruz
+    logo: esarjLogo,
     primaryColor: '#FF5733', // E-Şarj turuncu
     secondaryColor: '#FF8B6B',
   },
   {
     id: 'trugo',
     name: 'Trugo',
-    logo: null, // Logo yerine null kullanıyoruz
+    logo: trugoLogo,
     primaryColor: '#7B35E9', // Trugo mor
     secondaryColor: '#9B6BF4',
   }

@@ -5,7 +5,6 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
@@ -18,10 +17,10 @@ import {
   Platform,
 } from "react-native"
 import MapView, { Marker, Callout, PROVIDER_DEFAULT, Polyline } from "react-native-maps"
-import { Ionicons, MaterialIcons, FontAwesome5 } from "@expo/vector-icons"
+import { Ionicons, FontAwesome5 } from "@expo/vector-icons"
 import api from "../api"
-import * as Location from 'expo-location'
-import { getRouteInfoPOST } from '../api/map'
+import * as Location from "expo-location"
+import { getRouteInfoPOST } from "../api/map"
 
 const { width, height } = Dimensions.get("window")
 const ANIMATION_DURATION = 300
@@ -38,11 +37,20 @@ const MapScreen = ({ navigation, route }) => {
   const [mapType, setMapType] = useState("standard")
   const [showLocationInfo, setShowLocationInfo] = useState(false)
   const [routeCoordinates, setRouteCoordinates] = useState([])
+  const [showChargingStations, setShowChargingStations] = useState(false)
+  const [routeStations, setRouteStations] = useState([])
+  const [isLoadingStations, setIsLoadingStations] = useState(false)
+  const [showRestStops, setShowRestStops] = useState(false)
+  const [restStops, setRestStops] = useState([])
+  const [isLoadingRestStops, setIsLoadingRestStops] = useState(false)
+  const [selectedRestStop, setSelectedRestStop] = useState(null)
+  const [showRestStopDetails, setShowRestStopDetails] = useState(false)
 
   // Animation values
   const locationInfoOpacity = useRef(new Animated.Value(0)).current
   const bottomNavHeight = useRef(new Animated.Value(80)).current
   const modalTranslateY = useRef(new Animated.Value(height)).current
+  const restStopModalTranslateY = useRef(new Animated.Value(height)).current
 
   // Haritanın başlangıç konumu - default Türkiye merkezine ayarlandı
   const [region, setRegion] = useState({
@@ -90,27 +98,51 @@ const MapScreen = ({ navigation, route }) => {
     }).start()
   }, [showStationDetails])
 
+  // Rest Stop modal gösterildiğinde animasyon
+  useEffect(() => {
+    Animated.timing(restStopModalTranslateY, {
+      toValue: showRestStopDetails ? 0 : height,
+      duration: ANIMATION_DURATION,
+      useNativeDriver: true,
+    }).start()
+  }, [showRestStopDetails])
+
   useEffect(() => {
     if (route?.params?.origin && route?.params?.destination) {
-      const { origin, destination, routeCoordinates } = route.params;
-      
+      const { origin, destination, routeCoordinates } = route.params
+
       // Eğer rota bilgileri hazır olarak geldiyse, doğrudan göster
       if (routeCoordinates && routeCoordinates.length > 0) {
-        console.log('Hazır rota bilgileri kullanılıyor:', routeCoordinates.length);
-        setRouteCoordinates(routeCoordinates);
-        
+        console.log("Hazır rota bilgileri kullanılıyor:", routeCoordinates.length)
+        setRouteCoordinates(routeCoordinates)
+
         // Haritayı rota başlangıç ve bitiş noktalarını gösterecek şekilde ayarla
         mapRef.current.fitToCoordinates(routeCoordinates, {
           edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-          animated: true
-        });
+          animated: true,
+        })
       } else {
         // Rota bilgisi gelmemişse, API'den al
-        console.log('Rota bilgileri API\'den alınacak');
-        fetchRouteInfo(origin, destination);
+        console.log("Rota bilgileri API'den alınacak")
+        fetchRouteInfo(origin, destination)
+      }
+
+      // Rota Detayları sayfasından gelen istekleri kontrol et
+      if (route.params?.fromRouteDetails) {
+        // Şarj istasyonlarını göster
+        if (route.params.showChargingStations) {
+          console.log("Rota Detayları sayfasından şarj istasyonlarını gösterme isteği alındı")
+          toggleChargingStations()
+        }
+
+        // Mola noktalarını göster
+        if (route.params.showRestStops) {
+          console.log("Rota Detayları sayfasından mola noktalarını gösterme isteği alındı")
+          toggleRestStops()
+        }
       }
     }
-  }, [route?.params]);
+  }, [route?.params])
 
   // İki konum arasındaki uzaklığı hesaplama (Haversine formülü)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -150,7 +182,7 @@ const MapScreen = ({ navigation, route }) => {
   const fetchNearbyChargingStations = async (latitude, longitude) => {
     setIsLoading(true)
     try {
-      const response = await api.get(`yakin-sarj-istasyonlari/?lat=${latitude}&lng=${longitude}`)
+      const response = await api.get(`yakin-sarj-istasyonlari/?lat=${latitude}&lng=${longitude}&radius=2`)
       console.log("API yanıtı:", response)
 
       // API yanıtını kontrol et
@@ -231,6 +263,9 @@ const MapScreen = ({ navigation, route }) => {
       },
       1000,
     )
+
+    // Seçilen konumun çevresindeki şarj istasyonlarını getir
+    fetchNearbyChargingStations(coordinate.latitude, coordinate.longitude)
   }
 
   // Kullanıcı konumuna git
@@ -238,45 +273,49 @@ const MapScreen = ({ navigation, route }) => {
     setIsLoading(true)
     try {
       // Önce cihazdan konum al
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.error("Konum izni verilmedi");
-        Alert.alert("Konum Hatası", "Konumunuza erişim izni verilmedi. Lütfen izinleri kontrol edin.", [{ text: "Tamam" }]);
-        setIsLoading(false);
-        return;
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== "granted") {
+        console.error("Konum izni verilmedi")
+        Alert.alert("Konum Hatası", "Konumunuza erişim izni verilmedi. Lütfen izinleri kontrol edin.", [
+          { text: "Tamam" },
+        ])
+        setIsLoading(false)
+        return
       }
-      
+
       // Konum al
       const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High
-      });
-      
+        accuracy: Location.Accuracy.High,
+      })
+
       const userCoords = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
       }
-      
+
       console.log("Cihazdan alınan konum:", userCoords)
-      
+
       try {
         // Konum bilgisini API'ye GET parametreleri ile gönder
         // API'nin istediği formata göre latitude ve longitude'u query parametresi olarak ekle
-        const response = await api.get(`kullanici-konumu/?latitude=${userCoords.latitude}&longitude=${userCoords.longitude}`)
+        const response = await api.get(
+          `kullanici-konumu/?latitude=${userCoords.latitude}&longitude=${userCoords.longitude}`,
+        )
         console.log("Kullanıcı konumu API yanıtı:", response.data)
-        
+
         // API yanıtı başarılı mı kontrol et
         if (response && response.data && response.data.success === true) {
           // API'den gelen konum bilgisini kullan
-          const serverLocation = response.data;
+          const serverLocation = response.data
           const userLocation = {
             latitude: Number(serverLocation.latitude || userCoords.latitude),
             longitude: Number(serverLocation.longitude || userCoords.longitude),
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }
-          
+
           console.log("API'den alınan konum kullanılıyor:", userLocation)
-          
+
           setRegion(userLocation)
           setSelectedLocation({
             latitude: userLocation.latitude,
@@ -284,11 +323,11 @@ const MapScreen = ({ navigation, route }) => {
           })
         } else {
           // API başarısız yanıt döndürdüyse, yerel konumu kullan
-          throw new Error("API geçerli konum verisi döndürmedi");
+          throw new Error("API geçerli konum verisi döndürmedi")
         }
       } catch (apiError) {
-        console.error("API ile konum işlemi hatası:", apiError.message);
-        
+        console.error("API ile konum işlemi hatası:", apiError.message)
+
         // API hatası olsa da cihazdan alınan konumu kullan
         const userLocation = {
           latitude: userCoords.latitude,
@@ -296,26 +335,29 @@ const MapScreen = ({ navigation, route }) => {
           latitudeDelta: 0.01,
           longitudeDelta: 0.01,
         }
-        
+
         console.log("Yerel konum kullanılıyor:", userLocation)
-        
+
         setRegion(userLocation)
         setSelectedLocation({
           latitude: userCoords.latitude,
           longitude: userCoords.longitude,
         })
       }
-      
+
       // Haritayı konuma taşı
       if (mapRef && mapRef.current) {
-        mapRef.current.animateToRegion({
-          latitude: selectedLocation?.latitude || userCoords.latitude,
-          longitude: selectedLocation?.longitude || userCoords.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01
-        }, 1000);
+        mapRef.current.animateToRegion(
+          {
+            latitude: selectedLocation?.latitude || userCoords.latitude,
+            longitude: selectedLocation?.longitude || userCoords.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          },
+          1000,
+        )
       }
-      
+
       // Konum bilgisini göster
       setShowLocationInfo(true)
       Animated.timing(locationInfoOpacity, {
@@ -323,10 +365,11 @@ const MapScreen = ({ navigation, route }) => {
         duration: ANIMATION_DURATION,
         useNativeDriver: true,
       }).start()
-      
     } catch (error) {
       console.error("Kullanıcı konumu alma işlemi başarısız:", error)
-      Alert.alert("Konum Hatası", "Konumunuz alınamadı. Lütfen tekrar deneyin veya konum izinlerinizi kontrol edin.", [{ text: "Tamam" }])
+      Alert.alert("Konum Hatası", "Konumunuz alınamadı. Lütfen tekrar deneyin veya konum izinlerinizi kontrol edin.", [
+        { text: "Tamam" },
+      ])
     } finally {
       setIsLoading(false)
     }
@@ -350,193 +393,602 @@ const MapScreen = ({ navigation, route }) => {
 
   const fetchRouteInfo = async (origin, destination) => {
     try {
-      setIsLoading(true);
-      console.log('Rota bilgisi isteniyor:', origin, destination);
-      
+      setIsLoading(true)
+      console.log("Rota bilgisi isteniyor:", origin, destination)
+
       // Koordinatlar kontrol ediliyor
       if (!origin.latitude || !destination.latitude) {
-        console.error('Geçersiz koordinatlar');
-        Alert.alert('Hata', 'Rota oluşturmak için geçerli koordinatlar gereklidir.');
-        setIsLoading(false);
-        return;
+        console.error("Geçersiz koordinatlar")
+        Alert.alert("Hata", "Rota oluşturmak için geçerli koordinatlar gereklidir.")
+        setIsLoading(false)
+        return
       }
-      
+
       // POST isteği kullanarak rota bilgisini al
       const routeData = await getRouteInfoPOST(
-        origin.latitude, 
-        origin.longitude, 
-        destination.latitude, 
+        origin.latitude,
+        origin.longitude,
+        destination.latitude,
         destination.longitude,
-        'driving'
-      );
-      
-      console.log('Rota verisi alındı');
-      
+        "driving",
+      )
+
+      console.log("Rota verisi alındı")
+
       // Doğrudan coordinates alanından verileri al - bu bizim polyline decoder'dan gelir
       if (routeData && routeData.coordinates && routeData.coordinates.length > 0) {
-        console.log(`${routeData.coordinates.length} detaylı rota koordinat noktası alındı`);
-        setRouteCoordinates(routeData.coordinates);
-        
+        console.log(`${routeData.coordinates.length} detaylı rota koordinat noktası alındı`)
+        setRouteCoordinates(routeData.coordinates)
+
         // Rota bilgilerine göre haritayı ayarla
         mapRef.current.fitToCoordinates(routeData.coordinates, {
           edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-          animated: true
-        });
-        return;
+          animated: true,
+        })
+        return
       }
-      
+
       // Eğer bizim decoder sonuçları yoksa, standart işlem yapılır
       if (routeData && routeData.routes && routeData.routes.length > 0) {
         // API'den gelen rota verilerini koordinat dizisine dönüştür
-        const route = routeData.routes[0];
-        console.log('Standart rota işlemi yapılıyor');
-        
+        const route = routeData.routes[0]
+        console.log("Standart rota işlemi yapılıyor")
+
         if (route.overview_polyline && route.overview_polyline.points) {
           // Rota genel bakış polyline değerini decode et
           try {
-            const decodedCoordinates = decodePolyline(route.overview_polyline.points);
+            const decodedCoordinates = decodePolyline(route.overview_polyline.points)
             if (decodedCoordinates && decodedCoordinates.length > 0) {
-              console.log(`Overview polyline decodlandı: ${decodedCoordinates.length} nokta`);
-              setRouteCoordinates(decodedCoordinates);
-              
+              console.log(`Overview polyline decodlandı: ${decodedCoordinates.length} nokta`)
+              setRouteCoordinates(decodedCoordinates)
+
               // Rota bilgilerine göre haritayı ayarla
               mapRef.current.fitToCoordinates(decodedCoordinates, {
                 edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-                animated: true
-              });
-              return;
+                animated: true,
+              })
+              return
             }
           } catch (decodeError) {
-            console.error('Polyline decode hatası:', decodeError);
+            console.error("Polyline decode hatası:", decodeError)
           }
         }
-        
+
         // Eğer overview_polyline yoksa veya decode edilemiyorsa, adım adım rota bilgilerini kullan
         if (route.legs && route.legs.length > 0) {
-          console.log('Rota bacak bilgilerinden koordinatlar oluşturuluyor');
-          const pathCoordinates = [];
-          
-          route.legs.forEach(leg => {
+          console.log("Rota bacak bilgilerinden koordinatlar oluşturuluyor")
+          const pathCoordinates = []
+
+          route.legs.forEach((leg) => {
             if (leg.steps) {
-              leg.steps.forEach(step => {
+              leg.steps.forEach((step) => {
                 // Adımların polyline verilerini decode et
                 if (step.polyline && step.polyline.points) {
                   try {
-                    const stepPoints = decodePolyline(step.polyline.points);
+                    const stepPoints = decodePolyline(step.polyline.points)
                     if (stepPoints && stepPoints.length > 0) {
-                      pathCoordinates.push(...stepPoints);
+                      pathCoordinates.push(...stepPoints)
                     } else {
                       // Polyline decode edilemezse, adımın başlangıç ve bitiş noktalarını ekle
                       pathCoordinates.push({
                         latitude: step.start_location.lat,
-                        longitude: step.start_location.lng
-                      });
+                        longitude: step.start_location.lng,
+                      })
                       pathCoordinates.push({
                         latitude: step.end_location.lat,
-                        longitude: step.end_location.lng
-                      });
+                        longitude: step.end_location.lng,
+                      })
                     }
                   } catch (stepDecodeError) {
-                    console.error('Adım polyline decode hatası:', stepDecodeError);
+                    console.error("Adım polyline decode hatası:", stepDecodeError)
                     // Hata durumunda başlangıç ve bitiş noktalarını ekle
                     pathCoordinates.push({
                       latitude: step.start_location.lat,
-                      longitude: step.start_location.lng
-                    });
+                      longitude: step.start_location.lng,
+                    })
                     pathCoordinates.push({
                       latitude: step.end_location.lat,
-                      longitude: step.end_location.lng
-                    });
+                      longitude: step.end_location.lng,
+                    })
                   }
                 } else {
                   // Polyline yoksa, adımın başlangıç ve bitiş noktalarını ekle
                   pathCoordinates.push({
                     latitude: step.start_location.lat,
-                    longitude: step.start_location.lng
-                  });
+                    longitude: step.start_location.lng,
+                  })
                   pathCoordinates.push({
                     latitude: step.end_location.lat,
-                    longitude: step.end_location.lng
-                  });
+                    longitude: step.end_location.lng,
+                  })
                 }
-              });
+              })
             }
-          });
-          
+          })
+
           // Eğer koordinatlar başarıyla oluşturulduysa, haritada göster
           if (pathCoordinates.length > 0) {
-            console.log(`${pathCoordinates.length} koordinat noktası işlendi`);
-            setRouteCoordinates(pathCoordinates);
-            
+            console.log(`${pathCoordinates.length} koordinat noktası işlendi`)
+            setRouteCoordinates(pathCoordinates)
+
             // Rota bilgilerine göre haritayı ayarla
             mapRef.current.fitToCoordinates(pathCoordinates, {
               edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-              animated: true
-            });
-            return;
+              animated: true,
+            })
+            return
           }
         }
-        
-        console.warn('Rota koordinatları oluşturulamadı');
-        Alert.alert('Uyarı', 'Bu rotada yol bilgisi bulunamadı. Lütfen geçerli adresler girdiğinizden emin olun.');
+
+        console.warn("Rota koordinatları oluşturulamadı")
+        Alert.alert("Uyarı", "Bu rotada yol bilgisi bulunamadı. Lütfen geçerli adresler girdiğinizden emin olun.")
       } else {
-        console.warn('Rota verisi bulunamadı');
-        Alert.alert('Uyarı', 'Bu rotada yol bilgisi bulunamadı. Lütfen geçerli adresler girdiğinizden emin olun.');
+        console.warn("Rota verisi bulunamadı")
+        Alert.alert("Uyarı", "Bu rotada yol bilgisi bulunamadı. Lütfen geçerli adresler girdiğinizden emin olun.")
       }
     } catch (error) {
-      console.error('Rota bilgisi alınırken hata:', error);
-      Alert.alert('Hata', error.message || 'Rota bilgisi alınamadı. Lütfen tekrar deneyin.');
+      console.error("Rota bilgisi alınırken hata:", error)
+      Alert.alert("Hata", error.message || "Rota bilgisi alınamadı. Lütfen tekrar deneyin.")
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   // Google polyline decoder fonksiyonu
   const decodePolyline = (encoded) => {
     if (!encoded || encoded.length === 0) {
-      return [];
+      return []
     }
-    
-    const poly = [];
-    let index = 0;
-    const len = encoded.length;
-    let lat = 0;
-    let lng = 0;
+
+    const poly = []
+    let index = 0
+    const len = encoded.length
+    let lat = 0
+    let lng = 0
 
     while (index < len) {
-      let b;
-      let shift = 0;
-      let result = 0;
-      
-      do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      
-      const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
+      let b
+      let shift = 0
+      let result = 0
 
-      shift = 0;
-      result = 0;
-      
       do {
-        b = encoded.charCodeAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      
-      const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
+        b = encoded.charCodeAt(index++) - 63
+        result |= (b & 0x1f) << shift
+        shift += 5
+      } while (b >= 0x20)
+
+      const dlat = result & 1 ? ~(result >> 1) : result >> 1
+      lat += dlat
+
+      shift = 0
+      result = 0
+
+      do {
+        b = encoded.charCodeAt(index++) - 63
+        result |= (b & 0x1f) << shift
+        shift += 5
+      } while (b >= 0x20)
+
+      const dlng = result & 1 ? ~(result >> 1) : result >> 1
+      lng += dlng
 
       poly.push({
         latitude: lat * 1e-5,
-        longitude: lng * 1e-5
-      });
+        longitude: lng * 1e-5,
+      })
     }
-    
-    return poly;
-  };
+
+    return poly
+  }
+
+  // Rota üzerindeki noktaları belirli aralıklarla bölen fonksiyon
+  const getRouteCheckpoints = (coordinates, intervalKm = 25) => {
+    if (!coordinates || coordinates.length < 2) return []
+
+    const checkpoints = []
+    let totalDistance = 0
+
+    // Başlangıç ve bitiş noktalarını hariç tut
+    for (let i = 1; i < coordinates.length - 1; i++) {
+      const current = coordinates[i]
+      const next = coordinates[i + 1]
+
+      // İki nokta arasındaki mesafeyi hesapla (km)
+      const distance = calculateDistance(current.latitude, current.longitude, next.latitude, next.longitude) / 1000 // metre'den km'ye çevir
+
+      totalDistance += distance
+
+      // Belirlenen aralığa ulaşıldığında kontrol noktası ekle
+      if (totalDistance >= intervalKm) {
+        checkpoints.push({
+          latitude: next.latitude,
+          longitude: next.longitude,
+        })
+        totalDistance = 0 // Mesafeyi sıfırla
+      }
+    }
+
+    return checkpoints
+  }
+
+  // Şarj istasyonlarını göster/gizle
+  const toggleChargingStations = async () => {
+    if (!showChargingStations && routeCoordinates.length > 0) {
+      setIsLoadingStations(true)
+      try {
+        // Rota üzerindeki kontrol noktalarını al (her 100 km'de bir)
+        const checkpoints = getRouteCheckpoints(routeCoordinates, 25)
+        console.log(`${checkpoints.length} kontrol noktası oluşturuldu`)
+
+        // Her kontrol noktası için şarj istasyonlarını ara
+        const allStations = new Map() // Tekrar eden istasyonları önlemek için Map kullan
+
+        for (const checkpoint of checkpoints) {
+          try {
+            const response = await api.get(
+              `yakin-sarj-istasyonlari/?lat=${checkpoint.latitude}&lng=${checkpoint.longitude}&radius=2`,
+            ) // 2 km yarıçap
+
+            if (response.data && response.data.stations) {
+              response.data.stations.forEach((station) => {
+                // Her istasyonu benzersiz bir ID ile ekle
+                const stationId = station.place_id || `${station.latitude}-${station.longitude}`
+                if (!allStations.has(stationId)) {
+                  allStations.set(stationId, {
+                    ...station,
+                    id: stationId,
+                  })
+                }
+              })
+            }
+          } catch (error) {
+            console.error(`Kontrol noktası için şarj istasyonları alınamadı:`, error)
+            continue
+          }
+        }
+
+        // Map'ten diziye çevir
+        const uniqueStations = Array.from(allStations.values())
+        console.log(`${uniqueStations.length} benzersiz şarj istasyonu bulundu`)
+
+        setRouteStations(uniqueStations)
+        setShowChargingStations(true)
+      } catch (error) {
+        console.error("Şarj istasyonları yüklenirken hata:", error)
+        Alert.alert("Hata", "Şarj istasyonları yüklenirken bir sorun oluştu. Lütfen tekrar deneyin.")
+      } finally {
+        setIsLoadingStations(false)
+      }
+    } else {
+      setShowChargingStations(false)
+      setRouteStations([])
+    }
+  }
+
+  // AI önerisi ile mola noktalarını göster/gizle
+  const toggleRestStops = async () => {
+    if (!showRestStops && routeCoordinates.length > 0) {
+      setIsLoadingRestStops(true)
+      try {
+        // Rota üzerindeki şehirleri belirle
+        const cities = extractCitiesFromRoute()
+
+        if (cities.length === 0) {
+          Alert.alert("Bilgi", "Rota üzerinde şehir bilgisi bulunamadı.")
+          setIsLoadingRestStops(false)
+          return
+        }
+
+        console.log("Rota üzerindeki şehirler:", cities)
+
+        // Normalde burada API isteği yapılacak, şimdilik örnek veri kullanıyoruz
+        // Bu kısım gerçek API entegrasyonu ile değiştirilecek
+        const mockRestStops = generateMockRestStops(cities)
+
+        // Kısa bir gecikme ekleyerek yükleme animasyonunu göster
+        setTimeout(() => {
+          setRestStops(mockRestStops)
+          setShowRestStops(true)
+          setIsLoadingRestStops(false)
+        }, 1500)
+      } catch (error) {
+        console.error("Mola noktaları yüklenirken hata:", error)
+        Alert.alert("Hata", "Mola noktaları yüklenirken bir sorun oluştu. Lütfen tekrar deneyin.")
+        setIsLoadingRestStops(false)
+      }
+    } else {
+      setShowRestStops(false)
+      setRestStops([])
+    }
+  }
+
+  // Rota üzerindeki şehirleri çıkaran yardımcı fonksiyon
+  const extractCitiesFromRoute = () => {
+    // Gerçek uygulamada, rota üzerindeki şehirleri belirlemek için
+    // reverse geocoding veya rota API'sinden gelen bilgiler kullanılabilir
+
+    // Örnek olarak, rotanın başlangıç, orta ve bitiş noktalarından şehirler
+    if (!routeCoordinates || routeCoordinates.length < 2) return []
+
+    const cities = []
+
+    // Başlangıç şehri
+    if (route?.params?.origin?.name) {
+      const originCity = route.params.origin.name.split(",")[0].trim()
+      cities.push(originCity)
+    }
+
+    // Rota üzerindeki ara şehirler (gerçek uygulamada API'den alınacak)
+    // Örnek olarak, rotanın uzunluğuna göre 1-3 ara şehir ekliyoruz
+    const routeLength = routeCoordinates.length
+
+    if (routeLength > 50) {
+      // Uzun rota için ara şehirler
+      const midPoint1 = routeCoordinates[Math.floor(routeLength * 0.25)]
+      const midPoint2 = routeCoordinates[Math.floor(routeLength * 0.5)]
+      const midPoint3 = routeCoordinates[Math.floor(routeLength * 0.75)]
+
+      // Gerçek uygulamada bu koordinatlar için reverse geocoding yapılacak
+      // Şimdilik örnek şehir isimleri
+      if (route?.params?.origin?.name && route?.params?.destination?.name) {
+        const originCity = route.params.origin.name.split(",")[0].trim()
+        const destCity = route.params.destination.name.split(",")[0].trim()
+
+        // Ankara-İstanbul rotası için örnek şehirler
+        if (originCity.includes("Ankara") && destCity.includes("İstanbul")) {
+          cities.push("Bolu")
+          cities.push("Sakarya")
+        }
+        // İstanbul-İzmir rotası için örnek şehirler
+        else if (originCity.includes("İstanbul") && destCity.includes("İzmir")) {
+          cities.push("Bursa")
+          cities.push("Balıkesir")
+        }
+        // Ankara-Antalya rotası için örnek şehirler
+        else if (originCity.includes("Ankara") && destCity.includes("Antalya")) {
+          cities.push("Konya")
+          cities.push("Isparta")
+        }
+        // Diğer rotalar için rastgele şehirler
+        else {
+          const turkishCities = ["Eskişehir", "Kayseri", "Konya", "Samsun", "Trabzon", "Gaziantep"]
+          const randomCity1 = turkishCities[Math.floor(Math.random() * turkishCities.length)]
+          cities.push(randomCity1)
+
+          const randomCity2 = turkishCities.filter((city) => city !== randomCity1)[
+            Math.floor(Math.random() * (turkishCities.length - 1))
+          ]
+          cities.push(randomCity2)
+        }
+      }
+    } else if (routeLength > 20) {
+      // Orta uzunlukta rota için bir ara şehir
+      if (route?.params?.origin?.name && route?.params?.destination?.name) {
+        const originCity = route.params.origin.name.split(",")[0].trim()
+        const destCity = route.params.destination.name.split(",")[0].trim()
+
+        // Ankara-Eskişehir rotası için örnek şehir
+        if (originCity.includes("Ankara") && destCity.includes("Eskişehir")) {
+          cities.push("Polatlı")
+        } else {
+          const turkishCities = ["Kırıkkale", "Afyon", "Düzce", "Çorum", "Yozgat"]
+          cities.push(turkishCities[Math.floor(Math.random() * turkishCities.length)])
+        }
+      }
+    }
+
+    // Varış şehri
+    if (route?.params?.destination?.name) {
+      const destCity = route.params.destination.name.split(",")[0].trim()
+      cities.push(destCity)
+    }
+
+    // Tekrarlanan şehirleri kaldır
+    return [...new Set(cities)]
+  }
+
+  // Örnek mola noktaları oluşturan fonksiyon
+  const generateMockRestStops = (cities) => {
+    const restStopTypes = [
+      { type: "cafe", name: "Kahve Molası", icon: "cafe" },
+      { type: "restaurant", name: "Restoran", icon: "restaurant" },
+      { type: "park", name: "Park", icon: "leaf" },
+      { type: "museum", name: "Müze", icon: "business" },
+      { type: "viewpoint", name: "Manzara Noktası", icon: "image" },
+    ]
+
+    return cities.flatMap((city, index) => {
+      // Her şehir için rastgele 1-2 mola noktası oluştur
+      const numStops = Math.floor(Math.random() * 2) + 1
+      const cityStops = []
+
+      for (let i = 0; i < numStops; i++) {
+        const randomType = restStopTypes[Math.floor(Math.random() * restStopTypes.length)]
+
+        // Şehre özgü mola noktası isimleri
+        let stopName = ""
+        let description = ""
+
+        if (city === "Ankara") {
+          if (randomType.type === "cafe") {
+            stopName = "Kuğulu Park Cafe"
+            description = "Kuğulu Park'ın yanında huzurlu bir ortamda kahvenizi yudumlayabilirsiniz."
+          } else if (randomType.type === "restaurant") {
+            stopName = "Hacı Arif Bey"
+            description = "Geleneksel Türk mutfağının en lezzetli örneklerini bulabileceğiniz tarihi bir mekan."
+          } else if (randomType.type === "museum") {
+            stopName = "Anadolu Medeniyetleri Müzesi"
+            description = "Türkiye'nin en önemli müzelerinden biri, Anadolu'nun zengin tarihini keşfedin."
+          } else {
+            stopName = `${city} ${randomType.name}`
+            description = `${city}'da keyifli bir mola noktası. Yolculuğunuza devam etmeden önce dinlenebilirsiniz.`
+          }
+        } else if (city === "İstanbul") {
+          if (randomType.type === "cafe") {
+            stopName = "Pierre Loti Cafe"
+            description = "Haliç'e hakim muhteşem manzarasıyla ünlü tarihi bir kafe."
+          } else if (randomType.type === "restaurant") {
+            stopName = "Karaköy Lokantası"
+            description = "Geleneksel Türk mutfağının modern yorumlarını sunan şık bir mekan."
+          } else if (randomType.type === "museum") {
+            stopName = "Topkapı Sarayı"
+            description = "Osmanlı İmparatorluğu'nun 400 yıl boyunca yönetim merkezi olan muhteşem saray."
+          } else {
+            stopName = `${city} ${randomType.name}`
+            description = `${city}'da keyifli bir mola noktası. Yolculuğunuza devam etmeden önce dinlenebilirsiniz.`
+          }
+        } else if (city === "İzmir") {
+          if (randomType.type === "cafe") {
+            stopName = "Kordon Cafe"
+            description = "İzmir Körfezi manzarasına karşı keyifli bir kahve molası."
+          } else if (randomType.type === "restaurant") {
+            stopName = "Deniz Restaurant"
+            description = "Taze deniz ürünleri ve Ege mutfağının lezzetlerini sunan bir mekan."
+          } else {
+            stopName = `${city} ${randomType.name}`
+            description = `${city}'da keyifli bir mola noktası. Yolculuğunuza devam etmeden önce dinlenebilirsiniz.`
+          }
+        } else if (city === "Antalya") {
+          if (randomType.type === "cafe") {
+            stopName = "Kaleiçi Cafe"
+            description = "Tarihi Kaleiçi'nde otantik bir ortamda kahve keyfi."
+          } else if (randomType.type === "viewpoint") {
+            stopName = "Düden Şelalesi"
+            description = "Muhteşem doğa manzarası sunan şelale, fotoğraf çekmek için ideal."
+          } else {
+            stopName = `${city} ${randomType.name}`
+            description = `${city}'da keyifli bir mola noktası. Yolculuğunuza devam etmeden önce dinlenebilirsiniz.`
+          }
+        } else if (city === "Bolu") {
+          if (randomType.type === "restaurant") {
+            stopName = "Bolu Kebapçısı"
+            description = "Meşhur Bolu mutfağının lezzetlerini tadabileceğiniz otantik bir mekan."
+          } else if (randomType.type === "viewpoint") {
+            stopName = "Abant Gölü"
+            description = "Doğal güzelliğiyle ünlü Abant Gölü'nde huzurlu bir mola."
+          } else {
+            stopName = `${city} ${randomType.name}`
+            description = `${city}'da keyifli bir mola noktası. Yolculuğunuza devam etmeden önce dinlenebilirsiniz.`
+          }
+        } else {
+          stopName = `${city} ${randomType.name}`
+          description = `${city}'da keyifli bir mola noktası.  Yolculuğunuza devam etmeden önce dinlenebilirsiniz.`
+        }
+
+        // Rastgele koordinat oluştur (gerçek uygulamada API'den gelecek)
+        // Rota üzerindeki bir noktaya yakın olacak şekilde
+        const routeIndex = Math.floor((routeCoordinates.length * (index + 1)) / (cities.length + 1))
+        const baseCoord = routeCoordinates[routeIndex]
+
+        // Koordinata küçük bir rastgele sapma ekle
+        const latitude = baseCoord.latitude + (Math.random() - 0.5) * 0.01
+        const longitude = baseCoord.longitude + (Math.random() - 0.5) * 0.01
+
+        cityStops.push({
+          id: `rest-stop-${city}-${i}`,
+          name: stopName,
+          type: randomType.type,
+          icon: randomType.icon,
+          city: city,
+          description: description,
+          rating: (3 + Math.random() * 2).toFixed(1), // 3.0-5.0 arası rastgele puanlama
+          coordinate: {
+            latitude,
+            longitude,
+          },
+        })
+      }
+
+      return cityStops
+    }) // İç içe dizileri düzleştir
+  }
+
+  // Mola noktası marker'ına tıklandığında
+  const handleRestStopPress = (e, restStop) => {
+    setSelectedRestStop(restStop)
+    setShowRestStopDetails(true)
+
+    // Modal animasyonunu başlat
+    Animated.timing(restStopModalTranslateY, {
+      toValue: 0,
+      duration: ANIMATION_DURATION,
+      useNativeDriver: true,
+    }).start()
+  }
+
+  // İstasyonu rotaya ekle
+  const addStationToRoute = async (station) => {
+    try {
+      setIsLoading(true)
+
+      // Mevcut rotayı iki parçaya böl
+      const stationIndex = routeCoordinates.findIndex(
+        (coord) =>
+          Math.abs(coord.latitude - station.latitude) < 0.001 && Math.abs(coord.longitude - station.longitude) < 0.001,
+      )
+
+      if (stationIndex === -1) {
+        // İstasyon rotaya yakın bir noktada değilse, en yakın noktayı bul
+        const nearestPoint = findNearestPointOnRoute(station, routeCoordinates)
+
+        // Yeni rota hesapla
+        const newRoute = await recalculateRouteWithWaypoint(station)
+        if (newRoute) {
+          setRouteCoordinates(newRoute)
+          Alert.alert("Başarılı", `${station.name} rotaya eklendi.`)
+        }
+      } else {
+        Alert.alert("Bilgi", "Bu istasyon zaten rota üzerinde.")
+      }
+    } catch (error) {
+      console.error("İstasyon rotaya eklenirken hata:", error)
+      Alert.alert("Hata", "İstasyon rotaya eklenirken bir sorun oluştu.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Rotadaki en yakın noktayı bul
+  const findNearestPointOnRoute = (station, routeCoords) => {
+    let minDistance = Number.POSITIVE_INFINITY
+    let nearestPoint = null
+
+    routeCoords.forEach((coord) => {
+      const distance = calculateDistance(station.latitude, station.longitude, coord.latitude, coord.longitude)
+      if (distance < minDistance) {
+        minDistance = distance
+        nearestPoint = coord
+      }
+    })
+
+    return nearestPoint
+  }
+
+  // Yeni waypoint ile rotayı yeniden hesapla
+  const recalculateRouteWithWaypoint = async (station) => {
+    try {
+      const origin = route.params.origin
+      const destination = route.params.destination
+
+      // İki aşamalı rota hesapla
+      const firstLeg = await getRouteInfoPOST(origin.latitude, origin.longitude, station.latitude, station.longitude)
+
+      const secondLeg = await getRouteInfoPOST(
+        station.latitude,
+        station.longitude,
+        destination.latitude,
+        destination.longitude,
+      )
+
+      if (firstLeg && secondLeg) {
+        // İki rotayı birleştir
+        return [...firstLeg.coordinates, ...secondLeg.coordinates]
+      }
+    } catch (error) {
+      console.error("Rota yeniden hesaplanırken hata:", error)
+      throw error
+    }
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -561,29 +1013,29 @@ const MapScreen = ({ navigation, route }) => {
             <Marker
               coordinate={{
                 latitude: route.params.origin.latitude,
-                longitude: route.params.origin.longitude
+                longitude: route.params.origin.longitude,
               }}
               title="Başlangıç"
               description={route.params.origin.name}
               pinColor="#2ecc71" // Yeşil pin
             >
-              <View style={[styles.customMarker, { backgroundColor: '#2ecc71' }]}>
+              <View style={[styles.customMarker, { backgroundColor: "#2ecc71" }]}>
                 <Ionicons name="flag" size={16} color="#fff" />
               </View>
             </Marker>
           )}
-          
+
           {route?.params?.destination && (
             <Marker
               coordinate={{
                 latitude: route.params.destination.latitude,
-                longitude: route.params.destination.longitude
+                longitude: route.params.destination.longitude,
               }}
               title="Varış"
               description={route.params.destination.name}
               pinColor="#e74c3c" // Kırmızı pin
             >
-              <View style={[styles.customMarker, { backgroundColor: '#e74c3c' }]}>
+              <View style={[styles.customMarker, { backgroundColor: "#e74c3c" }]}>
                 <Ionicons name="location" size={16} color="#fff" />
               </View>
             </Marker>
@@ -599,7 +1051,7 @@ const MapScreen = ({ navigation, route }) => {
             </Marker>
           )}
 
-          {/* Şarj istasyonları */}
+          {/* Yakındaki şarj istasyonları */}
           {chargingStations.map((station) => (
             <Marker
               key={station.id}
@@ -641,21 +1093,109 @@ const MapScreen = ({ navigation, route }) => {
               lineJoin="round"
             />
           )}
+
+          {/* Rota üzerindeki şarj istasyonları */}
+          {showChargingStations &&
+            routeStations.map((station) => (
+              <Marker
+                key={station.id || station.place_id}
+                coordinate={{
+                  latitude: Number.parseFloat(station.latitude || station.lat),
+                  longitude: Number.parseFloat(station.longitude || station.lng),
+                }}
+                onPress={() =>
+                  handleStationPress(null, {
+                    ...station,
+                    coordinate: {
+                      latitude: Number.parseFloat(station.latitude || station.lat),
+                      longitude: Number.parseFloat(station.longitude || station.lng),
+                    },
+                    title: station.name,
+                    description: station.vicinity,
+                  })
+                }
+              >
+                <View style={styles.markerContainer}>
+                  <FontAwesome5 name="charging-station" size={14} color="#fff" />
+                  {station.rating > 0 && (
+                    <View style={styles.ratingContainer}>
+                      <Text style={styles.ratingText}>{station.rating.toFixed(1)}</Text>
+                    </View>
+                  )}
+                </View>
+                <Callout tooltip>
+                  <View style={styles.calloutContainer}>
+                    <Text style={styles.calloutTitle}>{station.name}</Text>
+                    {station.vicinity ? <Text style={styles.calloutDescription}>{station.vicinity}</Text> : null}
+                    <View style={styles.calloutFooter}>
+                      <TouchableOpacity
+                        style={styles.addToRouteButton}
+                        onPress={() => {
+                          addStationToRoute({
+                            ...station,
+                            latitude: Number.parseFloat(station.latitude || station.lat),
+                            longitude: Number.parseFloat(station.longitude || station.lng),
+                          })
+                          setShowStationDetails(false)
+                        }}
+                      >
+                        <Text style={styles.addToRouteText}>Rotaya Ekle</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </Callout>
+              </Marker>
+            ))}
+
+          {/* Mola noktaları */}
+          {showRestStops &&
+            restStops.map((restStop) => (
+              <Marker
+                key={restStop.id}
+                coordinate={restStop.coordinate}
+                onPress={(e) => {
+                  e.stopPropagation() // Haritaya tıklama olayından ayır
+                  handleRestStopPress(e, restStop)
+                }}
+              >
+                <View
+                  style={[styles.restStopMarker, { backgroundColor: restStop.type === "cafe" ? "#8e44ad" : "#27ae60" }]}
+                >
+                  <Ionicons name={restStop.icon} size={14} color="#fff" />
+                  {restStop.rating && (
+                    <View style={styles.ratingContainer}>
+                      <Text style={styles.ratingText}>{restStop.rating}</Text>
+                    </View>
+                  )}
+                </View>
+                <Callout tooltip>
+                  <View style={styles.calloutContainer}>
+                    <Text style={styles.calloutTitle}>{restStop.name}</Text>
+                    <Text style={styles.calloutDescription}>{restStop.city}</Text>
+                    <View style={styles.calloutFooter}>
+                      <Text style={styles.calloutInfoText}>Detaylar için tıklayın</Text>
+                      <Ionicons name="chevron-forward" size={12} color="#8e44ad" />
+                    </View>
+                  </View>
+                </Callout>
+              </Marker>
+            ))}
         </MapView>
 
         {/* Arama Çubuğu - Yeniden Düzenlenmiş */}
         <View style={styles.searchContainer}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => {
+              // Navigate to HomeScreen instead of going back
+              navigation.navigate("Home")
+            }}
+          >
             <Ionicons name="arrow-back" size={22} color="#333" />
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.searchBar}
-            onPress={() => navigation.navigate('SearchRoute')}
-          >
+          <TouchableOpacity style={styles.searchBar} onPress={() => navigation.navigate("SearchRoute")}>
             <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-            <Text style={styles.searchInput}>
-              {searchText || "Konum veya şarj istasyonu ara"}
-            </Text>
+            <Text style={styles.searchInput}>{searchText || "Konum veya şarj istasyonu ara"}</Text>
             {searchText.length > 0 && (
               <TouchableOpacity onPress={() => setSearchText("")}>
                 <Ionicons name="close-circle" size={20} color="#666" />
@@ -672,6 +1212,32 @@ const MapScreen = ({ navigation, route }) => {
           <TouchableOpacity style={styles.mapControlButton} onPress={goToUserLocation}>
             <Ionicons name="locate" size={22} color="#333" />
           </TouchableOpacity>
+          {routeCoordinates.length > 0 && (
+            <TouchableOpacity
+              style={[styles.mapControlButton, showChargingStations && styles.activeControlButton]}
+              onPress={toggleChargingStations}
+              disabled={isLoadingStations}
+            >
+              {isLoadingStations ? (
+                <ActivityIndicator size="small" color="#00b8d4" />
+              ) : (
+                <FontAwesome5 name="charging-station" size={20} color={showChargingStations ? "#00b8d4" : "#333"} />
+              )}
+            </TouchableOpacity>
+          )}
+          {routeCoordinates.length > 0 && (
+            <TouchableOpacity
+              style={[styles.mapControlButton, showRestStops && styles.activeControlButton]}
+              onPress={toggleRestStops}
+              disabled={isLoadingRestStops}
+            >
+              {isLoadingRestStops ? (
+                <ActivityIndicator size="small" color="#00b8d4" />
+              ) : (
+                <Ionicons name="cafe" size={20} color={showRestStops ? "#00b8d4" : "#333"} />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Yükleniyor indikatörü */}
@@ -694,10 +1260,9 @@ const MapScreen = ({ navigation, route }) => {
               <View style={styles.locationCoordinates}>
                 <Ionicons name="location" size={16} color="#00b8d4" style={styles.locationIcon} />
                 <Text style={styles.locationInfoText}>
-                  {selectedLocation && typeof selectedLocation.latitude === 'number' 
+                  {selectedLocation && typeof selectedLocation.latitude === "number"
                     ? `${selectedLocation.latitude.toFixed(6)}, ${selectedLocation.longitude.toFixed(6)}`
-                    : 'Koordinat bilgisi yükleniyor...'
-                  }
+                    : "Koordinat bilgisi yükleniyor..."}
                 </Text>
               </View>
               <View style={styles.stationCountContainer}>
@@ -709,80 +1274,181 @@ const MapScreen = ({ navigation, route }) => {
             </View>
           </Animated.View>
         )}
-      </View>
 
-      {/* Şarj istasyonu detay modali */}
-      <Modal
-        visible={showStationDetails}
-        transparent={true}
-        animationType="none"
-        onRequestClose={() => setShowStationDetails(false)}
-      >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowStationDetails(false)}>
-          <Animated.View style={[styles.modalContainer, { transform: [{ translateY: modalTranslateY }] }]}>
-            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.modalDragIndicator} />
+        {/* Şarj istasyonu detay modali */}
+        <Modal
+          visible={showStationDetails}
+          transparent={true}
+          animationType="none"
+          onRequestClose={() => setShowStationDetails(false)}
+        >
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowStationDetails(false)}>
+            <Animated.View style={[styles.modalContainer, { transform: [{ translateY: modalTranslateY }] }]}>
+              <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.modalDragIndicator} />
 
-              <View style={styles.modalHeader}>
-                <View style={styles.modalTitleContainer}>
-                  <FontAwesome5 name="charging-station" size={18} color="#00b8d4" style={styles.modalTitleIcon} />
-                  <Text style={styles.modalTitle} numberOfLines={2}>
-                    {selectedStation?.title}
-                  </Text>
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalTitleContainer}>
+                    <FontAwesome5 name="charging-station" size={18} color="#00b8d4" style={styles.modalTitleIcon} />
+                    <Text style={styles.modalTitle} numberOfLines={2}>
+                      {selectedStation?.title}
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.closeButton} onPress={() => setShowStationDetails(false)}>
+                    <Ionicons name="close" size={24} color="#333" />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={styles.closeButton} onPress={() => setShowStationDetails(false)}>
-                  <Ionicons name="close" size={24} color="#333" />
-                </TouchableOpacity>
-              </View>
 
-              <View style={styles.modalContent}>
-                {selectedStation?.rating > 0 && (
-                  <View style={styles.ratingRow}>
-                    <Text style={styles.ratingLabel}>Değerlendirme</Text>
-                    <View style={styles.starsContainer}>
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Ionicons
-                          key={star}
-                          name={selectedStation.rating >= star ? "star" : "star-outline"}
-                          size={18}
-                          color="#FFD700"
-                          style={{ marginRight: 2 }}
-                        />
-                      ))}
-                      <Text style={styles.ratingValue}> ({selectedStation.rating.toFixed(1)})</Text>
+                <View style={styles.modalContent}>
+                  {selectedStation?.rating > 0 && (
+                    <View style={styles.ratingRow}>
+                      <Text style={styles.ratingLabel}>Değerlendirme</Text>
+                      <View style={styles.starsContainer}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={selectedStation.rating >= star ? "star" : "star-outline"}
+                            size={18}
+                            color="#FFD700"
+                            style={{ marginRight: 2 }}
+                          />
+                        ))}
+                        <Text style={styles.ratingValue}> ({selectedStation.rating.toFixed(1)})</Text>
+                      </View>
                     </View>
+                  )}
+
+                  {selectedStation?.vicinity ? (
+                    <View style={styles.infoRow}>
+                      <Ionicons name="location" size={18} color="#00b8d4" style={styles.infoIcon} />
+                      <Text style={styles.infoText}>{selectedStation.vicinity}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.buttonsContainer}>
+                    <TouchableOpacity
+                      style={styles.directionButton}
+                      onPress={() => {
+                        openDirections(selectedStation)
+                        setShowStationDetails(false)
+                      }}
+                    >
+                      <Ionicons name="navigate" size={18} color="#fff" style={styles.buttonIcon} />
+                      <Text style={styles.buttonText}>Yol Tarifi</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.addToRouteButton}
+                      onPress={() => {
+                        addStationToRoute(selectedStation)
+                        setShowStationDetails(false)
+                      }}
+                    >
+                      <Ionicons name="add-circle" size={18} color="#fff" style={styles.buttonIcon} />
+                      <Text style={styles.buttonText}>Rotaya Ekle</Text>
+                    </TouchableOpacity>
                   </View>
-                )}
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        </Modal>
 
-                {selectedStation?.description ? (
-                  <View style={styles.infoRow}>
-                    <Ionicons name="location" size={18} color="#00b8d4" style={styles.infoIcon} />
-                    <Text style={styles.infoText}>{selectedStation.description}</Text>
+        {/* Mola noktası detay modali */}
+        <Modal
+          visible={showRestStopDetails}
+          transparent={true}
+          animationType="none"
+          onRequestClose={() => setShowRestStopDetails(false)}
+        >
+          <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowRestStopDetails(false)}>
+            <Animated.View style={[styles.modalContainer, { transform: [{ translateY: restStopModalTranslateY }] }]}>
+              <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                <View style={styles.modalDragIndicator} />
+
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalTitleContainer}>
+                    <Ionicons
+                      name={selectedRestStop?.icon || "cafe"}
+                      size={18}
+                      color="#8e44ad"
+                      style={styles.modalTitleIcon}
+                    />
+                    <Text style={[styles.modalTitle, { color: "#8e44ad" }]} numberOfLines={2}>
+                      {selectedRestStop?.name}
+                    </Text>
                   </View>
-                ) : null}
-
-                <View style={styles.buttonsContainer}>
-                  <TouchableOpacity
-                    style={styles.directionButton}
-                    onPress={() => {
-                      openDirections(selectedStation)
-                      setShowStationDetails(false)
-                    }}
-                  >
-                    <Ionicons name="navigate" size={18} color="#fff" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Yol Tarifi</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.favoriteButton}>
-                    <Ionicons name="heart-outline" size={18} color="#fff" style={styles.buttonIcon} />
-                    <Text style={styles.buttonText}>Favorilere Ekle</Text>
+                  <TouchableOpacity style={styles.closeButton} onPress={() => setShowRestStopDetails(false)}>
+                    <Ionicons name="close" size={24} color="#333" />
                   </TouchableOpacity>
                 </View>
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
-      </Modal>
+
+                <View style={styles.modalContent}>
+                  <View style={styles.restStopCityContainer}>
+                    <Ionicons name="location" size={16} color="#8e44ad" />
+                    <Text style={styles.restStopCityText}>{selectedRestStop?.city}</Text>
+                  </View>
+
+                  {selectedRestStop?.rating && (
+                    <View style={styles.ratingRow}>
+                      <Text style={styles.ratingLabel}>Değerlendirme</Text>
+                      <View style={styles.starsContainer}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={selectedRestStop.rating >= star ? "star" : "star-outline"}
+                            size={18}
+                            color="#FFD700"
+                            style={{ marginRight: 2 }}
+                          />
+                        ))}
+                        <Text style={styles.ratingValue}> ({selectedRestStop.rating})</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  <View style={styles.restStopDescriptionContainer}>
+                    <Text style={styles.restStopDescriptionTitle}>Hakkında</Text>
+                    <Text style={styles.restStopDescription}>
+                      {selectedRestStop?.description || "Bu mola noktası hakkında detaylı bilgi bulunmamaktadır."}
+                    </Text>
+                  </View>
+
+                  <View style={styles.buttonsContainer}>
+                    <TouchableOpacity
+                      style={[styles.directionButton, { backgroundColor: "#8e44ad" }]}
+                      onPress={() => {
+                        if (selectedRestStop) {
+                          openDirections({
+                            coordinate: selectedRestStop.coordinate,
+                            title: selectedRestStop.name,
+                          })
+                        }
+                        setShowRestStopDetails(false)
+                      }}
+                    >
+                      <Ionicons name="navigate" size={18} color="#fff" style={styles.buttonIcon} />
+                      <Text style={styles.buttonText}>Yol Tarifi</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.addToRouteButton, { backgroundColor: "#8e44ad" }]}
+                      onPress={() => {
+                        // Burada mola noktasını rotaya ekleme işlemi yapılabilir
+                        Alert.alert("Bilgi", `${selectedRestStop?.name} rotanıza eklendi.`)
+                        setShowRestStopDetails(false)
+                      }}
+                    >
+                      <Ionicons name="add-circle" size={18} color="#fff" style={styles.buttonIcon} />
+                      <Text style={styles.buttonText}>Rotaya Ekle</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        </Modal>
+      </View>
 
       {/* Alt Navigasyon - Konum butonu kaldırıldı */}
       <Animated.View style={[styles.bottomNav, { height: bottomNavHeight }]}>
@@ -792,12 +1458,24 @@ const MapScreen = ({ navigation, route }) => {
             <Text style={[styles.navText, { color: "#00b8d4" }]}>Keşfet</Text>
           </TouchableOpacity>
 
-          {/* Konum butonu kaldırıldı */}
-
-          <TouchableOpacity style={styles.navButton}>
-            <FontAwesome5 name="charging-station" size={22} color="#666" />
-            <Text style={styles.navText}>İstasyonlar</Text>
-          </TouchableOpacity>
+          {routeCoordinates.length > 0 && route?.params?.origin && route?.params?.destination ? (
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={() => {
+                navigation.navigate("SearchDetails", {
+                  origin: route.params.origin,
+                  destination: route.params.destination,
+                  routeCoordinates: routeCoordinates,
+                  routeInfo: route.params.routeInfo || {},
+                })
+              }}
+            >
+              <Ionicons name="map-outline" size={24} color="#666" />
+              <Text style={styles.navText}>Rota Bilgileri</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.emptyNavButton} />
+          )}
 
           <TouchableOpacity style={styles.navButton}>
             <Ionicons name="settings-outline" size={24} color="#666" />
@@ -1192,16 +1870,77 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#00b8d4',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#00b8d4",
+    justifyContent: "center",
+    alignItems: "center",
     borderWidth: 2,
-    borderColor: '#fff',
-    shadowColor: '#000',
+    borderColor: "#fff",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 3,
+  },
+  activeControlButton: {
+    backgroundColor: "#e1f5fe",
+    borderColor: "#00b8d4",
+    borderWidth: 2,
+  },
+  addToRouteButton: {
+    backgroundColor: "#00b8d4",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    marginTop: 8,
+  },
+  addToRouteText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  restStopMarker: {
+    backgroundColor: "#8e44ad",
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 2,
+    borderColor: "#fff",
+  },
+  restStopCityContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    backgroundColor: "#f8f4fc",
+    padding: 10,
+    borderRadius: 8,
+  },
+  restStopCityText: {
+    fontSize: 14,
+    color: "#8e44ad",
+    fontWeight: "500",
+    marginLeft: 8,
+  },
+  restStopDescriptionContainer: {
+    backgroundColor: "#f8f4fc",
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 12,
+  },
+  restStopDescriptionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 6,
+  },
+  restStopDescription: {
+    fontSize: 14,
+    color: "#555",
+    lineHeight: 20,
+  },
+  emptyNavButton: {
+    width: 80,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
   },
 })
 
