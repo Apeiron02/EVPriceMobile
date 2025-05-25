@@ -74,6 +74,29 @@ export const userService = {
       throw error;
     }
   },
+
+  // Kullanıcının rota geçmişini getir
+  getRouteHistory: async () => {
+    try {
+      const response = await api.get('rota-gecmisi/');
+      console.log('Rota geçmişi yanıtı:', JSON.stringify(response.data));
+      
+      // API yanıtı bir paginated response olabilir
+      if (response.data && response.data.results) {
+        return response.data.results;
+      } 
+      // Veya doğrudan bir liste olarak gelebilir
+      else if (response.data && Array.isArray(response.data)) {
+        return response.data;
+      }
+      
+      // Eğer veri yoksa boş dizi döndür
+      return [];
+    } catch (error) {
+      console.error('Rota geçmişi getirme hatası:', error);
+      throw error;
+    }
+  }
 };
 
 export default userService;

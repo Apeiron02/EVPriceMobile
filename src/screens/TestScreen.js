@@ -1,180 +1,175 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, FlatList, TextInput, Alert } from 'react-native';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  SafeAreaView, 
+  StatusBar, 
+  TouchableOpacity, 
+  ScrollView,
+  Modal,
+  FlatList,
+  Alert,
+  ActivityIndicator,
+  TextInput,
+  SectionList
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { updateApiUrl, getApiBaseUrl } from '../api/index';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import authService from '../api/authService';
+import userService from '../api/userService';
+import carService from '../api/carService';
+import chargingProviderService from '../api/chargingProviderService';
+import { reset } from '../navigation/navigationUtils';
 
-const TestScreen = ({ navigation, route }) => {
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const [selectedEndpoint, setSelectedEndpoint] = useState('elektrikli-araclar');
-  const [latitude, setLatitude] = useState('41.0082');  // Default İstanbul koordinatları
-  const [longitude, setLongitude] = useState('28.9784');
-  const [ipAddress, setIpAddress] = useState('192.168.1.101'); // Güncel IP adresi
-  //const [ipAddress, setIpAddress] = useState('10.196.154.5'); // Güncel IP adresi
+// Gelişmiş yükleme göstergesi bileşeni
+const LoadingScreen = ({ message, isVisible }) => {
+  if (!isVisible) return null;
   
-  // Component mount olduğunda mevcut API URL'den IP'yi al
-  useEffect(() => {
-    const currentBaseUrl = getApiBaseUrl();
-    // http://10.196.154.5:8000 formatından IP adresini çıkar
-    const urlParts = currentBaseUrl.split('//');
-    if (urlParts.length > 1) {
-      const hostPart = urlParts[1].split(':')[0];
-      if (hostPart) {
-        setIpAddress(hostPart);
-      }
-    }
-    
-    // Rota parametrelerini kontrol et
-    if (route.params?.endpoint) {
-      setSelectedEndpoint(route.params.endpoint);
-      // Otomatik olarak API'yi test et
-      if (route.params?.autoTest) {
-        setTimeout(() => {
-          testConnection();
-        }, 500);
-      }
-    }
-  }, [route.params]);
-  
-  // Kullanılabilir API endpoint'leri
-  const apiEndpoints = [
-    'elektrikli-araclar',
-    'kullanici-arac-tercihi',
-    'rota-gecmisi',
-    'kullanici-kayit',
-    'kullanici-profil',
-    'kullanicilar',
-    'token',
-    'token-refresh',
-    'token-verify',
-    'yakin-sarj-istasyonlari',
-    'rota-bilgisi',
-    'hava-durumu'
-  ];
-  
-  // Endpoint'leri gruplar - UI için
-  const endpointGroups = [
-    { title: 'Kullanıcı Bilgileri', items: ['kullanici-kayit', 'kullanici-profil', 'kullanicilar'] },
-    { title: 'Araç Bilgileri', items: ['elektrikli-araclar', 'kullanici-arac-tercihi'] },
-    { title: 'Rota ve Harita', items: ['rota-gecmisi', 'rota-bilgisi', 'yakin-sarj-istasyonlari'] },
-    { title: 'Diğer', items: ['hava-durumu'] },
-    { title: 'Kimlik Doğrulama', items: ['token', 'token-refresh', 'token-verify'] },
-  ];
-  
-  // Endpoint için ikon seçimi
-  const getIconForEndpoint = (endpoint) => {
-    const iconMap = {
-      'elektrikli-araclar': 'car',
-      'kullanici-arac-tercihi': 'options',
-      'rota-gecmisi': 'time',
-      'kullanici-kayit': 'person-add',
-      'kullanici-profil': 'person',
-      'kullanicilar': 'people',
-      'token': 'key',
-      'token-refresh': 'refresh',
-      'token-verify': 'checkmark-circle',
-      'yakin-sarj-istasyonlari': 'flash',
-      'rota-bilgisi': 'map',
-      'hava-durumu': 'cloudy'
-    };
-    
-    return iconMap[endpoint] || 'code-working';
-  };
-  
-  // IP adresi değiştiğinde API URL'sini güncelle
-  const handleIpChange = (newIp) => {
-    setIpAddress(newIp);
-  };
+  return (
+    <View style={styles.loadingOverlay}>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#00b8d4" />
+        <Text style={styles.loadingText}>{message}</Text>
+      </View>
+    </View>
+  );
+};
 
-  // IP adresini kaydet ve API URL'sini güncelle
-  const updateServerIp = async () => {
-    try {
-      // Mevcut IP'yi al ve karşılaştır
-      const currentBaseUrl = getApiBaseUrl();
-      const urlParts = currentBaseUrl.split('//');
-      let currentIp = '';
-      if (urlParts.length > 1) {
-        currentIp = urlParts[1].split(':')[0];
-      }
-      
-      // IP değişikliği varsa token'ları temizle
-      if (currentIp !== ipAddress) {
-        console.log('IP değişikliği tespit edildi. Oturum bilgileri temizleniyor.');
-        await AsyncStorage.multiRemove(['access_token', 'refresh_token']);
-        
-        // Son kullanılan IP'yi güncelle
-        await AsyncStorage.setItem('last_used_ip', ipAddress);
-      }
-      
-      // Tüm uygulama için API URL'sini güncelle
-      updateApiUrl(ipAddress);
-      Alert.alert(
-        "Başarılı",
-        `Sunucu adresi güncellendi: ${ipAddress}`,
-        [{ text: "Tamam" }]
-      );
-    } catch (error) {
-      console.error('Sunucu IP güncellenirken hata:', error);
-      Alert.alert(
-        "Hata",
-        `Sunucu adresi güncellenirken bir hata oluştu: ${error.message}`,
-        [{ text: "Tamam" }]
-      );
-    }
-  };
+const UserProfileScreen = ({ navigation }) => {
+  const [selectedCar, setSelectedCar] = useState('TOGG T10X V1 RWD Uzun Menzil');
+  const [showCarPicker, setShowCarPicker] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingCars, setLoadingCars] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Araçlar yükleniyor...');
+  const [cars, setCars] = useState([]);
+  const [carDetails, setCarDetails] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [routeHistory, setRouteHistory] = useState([]);
+  const [loadingRouteHistory, setLoadingRouteHistory] = useState(false);
+  const [activeHistoryTab, setActiveHistoryTab] = useState('route'); // 'route' veya 'charging'
+  const [chargingHistory, setChargingHistory] = useState([]);
+  const [loadingChargingHistory, setLoadingChargingHistory] = useState(false);
   
-  const testConnection = async () => {
-    setLoading(true);
-    setResult(null);
-    setError(null);
+  // Kullanıcı bilgileri için state tanımla
+  const [userInfo, setUserInfo] = useState({
+    username: '',
+    email: '',
+    registrationDate: ''
+  });
+
+  // Arama sorgusuna göre araçları filtrele
+  const filteredCars = useMemo(() => {
+    if (!cars.length) return [];
+    if (!searchQuery.trim()) return cars;
     
-    try {
-      let url = `http://${ipAddress}:8000/api/v1/`;
-      
-      // Endpoint'e göre URL oluştur
-      if (selectedEndpoint === 'yakin-sarj-istasyonlari') {
-        url = `http://${ipAddress}:8000/api/v1/${selectedEndpoint}/?lat=${latitude}&lng=${longitude}`;
-      } else if (selectedEndpoint !== '') {
-        url = `http://${ipAddress}:8000/api/v1/${selectedEndpoint}/`;
-      }
-      
-      console.log('Requesting URL:', url);
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 saniye timeout
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal
+    const query = searchQuery.toLowerCase().trim();
+    return cars.filter(car => 
+      car.car_name.toLowerCase().includes(query) || 
+      (car.brand_name && car.brand_name.toLowerCase().includes(query))
+    );
+  }, [cars, searchQuery]);
+
+  // Araçları markalara göre grupla
+  const groupedCars = useMemo(() => {
+    if (!filteredCars.length) return [];
+    
+    // Öncelikle benzersiz markaları bulalım
+    const brands = [...new Set(filteredCars.map(car => {
+      // Marka bilgisi yoksa 'Diğer' olarak gruplayalım
+      const brandName = car.brand_name || (car.car_name.split(' ')[0] || 'Diğer');
+      return brandName;
+    }))];
+    
+    // Markaları alfabetik olarak sıralayalım
+    brands.sort((a, b) => a.localeCompare(b, 'tr', {sensitivity: 'base'}));
+    
+    // Her marka için bir bölüm oluşturalım
+    return brands.map(brand => {
+      // İlgili markaya ait tüm araçları bulalım
+      const carsInBrand = filteredCars.filter(car => {
+        const carBrand = car.brand_name || (car.car_name.split(' ')[0] || 'Diğer');
+        return carBrand === brand;
       });
       
-      clearTimeout(timeoutId);
+      // Bu markadaki araçları alfabetik olarak sıralayalım
+      carsInBrand.sort((a, b) => a.car_name.localeCompare(b.car_name, 'tr', {sensitivity: 'base'}));
       
-      const data = await response.json();
-      console.log('Response:', data);
-      setResult(data);
-    } catch (err) {
-      console.error('API Error:', err);
-      
-      let errorMessage = err.message;
-      if (err.name === 'AbortError') {
-        errorMessage = 'İstek zaman aşımına uğradı. Sunucu yanıt vermiyor.';
-      } else if (err.message === 'Network request failed') {
-        errorMessage = 'Ağ isteği başarısız oldu. Sunucu çalışmıyor veya IP adresi yanlış olabilir.';
+      return {
+        title: brand,
+        data: carsInBrand
+      };
+    });
+  }, [filteredCars]);
+  
+  // Araçları önce yükle, sonra kullanıcı bilgilerini getir
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        await fetchCars();
+        await fetchUserInfo();
+        await fetchRouteHistory();
+        await fetchChargingHistory();
+      } catch (error) {
+        console.error('Veri yükleme hatası:', error);
       }
+    };
+    
+    loadData();
+  }, []);
+  
+  const fetchUserInfo = async () => {
+    setLoading(true);
+    try {
+      const userData = await userService.getCurrentUser();
+      if (userData) {
+        // Tarih formatını düzenle, API'den gelen date_joined değerini kullanıyoruz
+        const registrationDate = userData.date_joined ? 
+          new Date(userData.date_joined).toLocaleDateString('tr-TR') : '';
+        
+        setUserInfo({
+          username: userData.username || '',
+          email: userData.email || '',
+          registrationDate: registrationDate
+        });
+      }
+
+      // Kullanıcının araç tercihini getir
+      console.log('Kullanıcı araç tercihi getiriliyor...');
+      const userCarPref = await userService.getUserCarPreference();
       
-      setError(errorMessage);
-      
-      // Daha detaylı hata mesajı göster
+      if (userCarPref) {
+        console.log('Kullanıcı araç tercihi alındı:', JSON.stringify(userCarPref));
+        
+        // Farklı API yanıt yapılarına göre araç ID'sini bul
+        let selectedCarId = null;
+        
+        if (userCarPref.selected_car_id) {
+          selectedCarId = userCarPref.selected_car_id;
+          console.log('selected_car_id alanından araç ID bulundu:', selectedCarId);
+        } else if (userCarPref.selected_car && userCarPref.selected_car.id) {
+          selectedCarId = userCarPref.selected_car.id;
+          console.log('selected_car.id alanından araç ID bulundu:', selectedCarId);
+        } else if (userCarPref.arac_id) {
+          selectedCarId = userCarPref.arac_id;
+          console.log('arac_id alanından araç ID bulundu:', selectedCarId);
+        }
+        
+        if (selectedCarId) {
+          console.log('Araç detayları getiriliyor, ID:', selectedCarId);
+          await fetchCarDetails(selectedCarId);
+        } else {
+          // Tercih var ama ID yok
+          checkAndSetDefaultCar();
+        }
+      } else {
+        console.log('Kullanıcının araç tercihi bulunamadı.');
+        checkAndSetDefaultCar();
+      }
+    } catch (error) {
+      console.error('Kullanıcı bilgileri yüklenirken hata:', error);
       Alert.alert(
-        "Bağlantı Hatası",
-        `API'ye bağlanırken bir hata oluştu: ${errorMessage}\n\nSunucunun çalıştığından, IP adresinin doğru olduğundan ve Django sunucunuzdaki CORS ayarlarının düzgün yapılandırıldığından emin olun.`,
+        "Hata", 
+        "Kullanıcı bilgileri yüklenirken bir hata oluştu.",
         [{ text: "Tamam" }]
       );
     } finally {
@@ -182,356 +177,864 @@ const TestScreen = ({ navigation, route }) => {
     }
   };
 
-  // Endpoint Butonu Renderlama
-  const renderEndpointButton = (endpoint) => (
-    <TouchableOpacity
-      key={endpoint}
-      style={[
-        styles.endpointButton,
-        selectedEndpoint === endpoint && styles.selectedEndpoint
-      ]}
-      onPress={() => setSelectedEndpoint(endpoint)}
-    >
-      <Ionicons 
-        name={getIconForEndpoint(endpoint)} 
-        size={20} 
-        color={selectedEndpoint === endpoint ? '#fff' : '#00b8d4'} 
-        style={styles.endpointIcon}
-      />
-      <Text 
-        style={[
-          styles.endpointText,
-          selectedEndpoint === endpoint && styles.selectedEndpointText,
-          { marginLeft: 8 }
-        ]}
-        numberOfLines={1}
-      >
-        {endpoint}
-      </Text>
-    </TouchableOpacity>
+  // Eğer araç listesi yüklenmişse ve kullanıcı tercihi yoksa ilk aracı seç
+  const checkAndSetDefaultCar = () => {
+    if (cars && cars.length > 0) {
+      console.log('Kullanıcı tercihi bulunamadı, varsayılan araç seçiliyor...');
+      setSelectedCar(cars[0].car_name);
+      fetchCarDetails(cars[0].id);
+    } else {
+      console.log('Araçlar henüz yüklenmedi, varsayılan araç seçilemiyor.');
+    }
+  };
+
+  // Tüm elektrikli araçları getir
+  const fetchCars = async () => {
+    setLoadingCars(true);
+    setLoadingMessage('Araç verileri yükleniyor...');
+    
+    try {
+      // Araç verisini getirmek ve tüm sayfaları birleştirmek için carService'i kullan
+      const carsData = await carService.getAllElectricCars();
+      
+      // API'den veri gelmiş mi kontrol et
+      console.log('Gelen toplam araç sayısı:', carsData.results ? carsData.results.length : 0);
+      
+      // API'den gelen veri yapısına göre results dizisini kullan
+      if (carsData && carsData.results && carsData.results.length > 0) {
+        setLoadingMessage('Araçlar sıralanıyor...');
+        
+        // Araçları alfabetik olarak sıralayalım
+        const sortedCars = [...carsData.results].sort((a, b) => 
+          a.car_name.localeCompare(b.car_name, 'tr', {sensitivity: 'base'})
+        );
+        
+        setCars(sortedCars);
+        console.log(`Toplam ${sortedCars.length} araç başarıyla yüklendi ve sıralandı`);
+      } else {
+        console.log('API\'den araç verisi gelmedi veya boş');
+        Alert.alert(
+          "Uyarı", 
+          "Araç listesi boş veya veriler alınamadı.",
+          [{ text: "Tamam" }]
+        );
+      }
+    } catch (error) {
+      console.error('Araç listesi yüklenirken hata:', error);
+      Alert.alert(
+        "Hata", 
+        "Araç listesi yüklenirken bir hata oluştu.",
+        [{ text: "Tamam" }]
+      );
+    } finally {
+      setLoadingCars(false);
+      setLoadingMessage('');
+    }
+  };
+
+  // Belirli bir aracın detaylarını getir
+  const fetchCarDetails = async (carId) => {
+    try {
+      const carData = await carService.getElectricCarById(carId);
+      setCarDetails(carData);
+      
+      // API'den araç detayı gelmiş mi kontrol et
+      console.log('Gelen araç detayı ID:', carId, 'Data:', carData);
+      
+      // Araç adını doğrudan API'den gelen veriden alarak ayarla
+      if (carData && carData.car_name) {
+        setSelectedCar(carData.car_name);
+        console.log('Araç adı ayarlandı:', carData.car_name);
+      } else {
+        // Eğer araç listesinde bu araç varsa, seçilmiş araç ismini ayarla
+        const selectedCarFromList = cars.find(car => car.id === carId);
+        if (selectedCarFromList) {
+          setSelectedCar(selectedCarFromList.car_name);
+          console.log('Araç adı listeden bulunarak ayarlandı:', selectedCarFromList.car_name);
+        }
+      }
+    } catch (error) {
+      consoles.error('Araç detayları yüklenirken hata:', error);
+    }
+  };
+  
+  // Araç seçme fonksiyonu
+  const handleCarSelect = async (car) => {
+    setShowCarPicker(false);
+    
+    try {
+      console.log('Seçilen araç:', car);
+      
+      // Araç detayları gelene kadar yükleniyor göster
+      setLoadingCars(true);
+      setLoadingMessage('Araç bilgileri yükleniyor...');
+      
+      // Kullanıcının araç tercihini kaydet
+      const response = await userService.setUserCarPreference(car.id);
+      console.log('Araç tercihi kaydetme yanıtı:', response.data);
+      
+      // Seçilen aracın detaylarını getir ve selectedCar değerini güncelle
+      await fetchCarDetails(car.id);
+      
+      console.log('Araç seçimi başarıyla tamamlandı: ' + car.car_name);
+    } catch (error) {
+      console.error('Araç tercihi kaydedilirken hata:', error);
+      
+      // Hata olduğu durumda da araç detaylarını getirmeyi dene
+      try {
+        await fetchCarDetails(car.id);
+      } catch (detailError) {
+        console.error('Araç detayları alınamadı:', detailError);
+      }
+      
+      Alert.alert(
+        "Bilgi", 
+        "Tercihleriniz geçici olarak gösterilecek, ancak sunucuya kaydedilemedi. Lütfen daha sonra tekrar deneyin.",
+        [{ text: "Tamam" }]
+      );
+    } finally {
+      setLoadingCars(false);
+      setLoadingMessage('');
+    }
+  };
+  
+  // Kullanıcının rota geçmişini getir
+  const fetchRouteHistory = async () => {
+    setLoadingRouteHistory(true);
+    try {
+      const routeHistoryData = await userService.getRouteHistory();
+      if (routeHistoryData && routeHistoryData.length > 0) {
+        console.log('Rota geçmişi başarıyla yüklendi:', routeHistoryData.length, 'rota.');
+        setRouteHistory(routeHistoryData);
+      } else {
+        console.log('Kullanıcının rota geçmişi bulunamadı veya boş.');
+        // Rota geçmişi boşsa örnek verileri gösterme
+        setRouteHistory([]);
+      }
+    } catch (error) {
+      console.error('Rota geçmişi yüklenirken hata:', error);
+      // Hata durumunda boş dizi ata
+      setRouteHistory([]);
+    } finally {
+      setLoadingRouteHistory(false);
+    }
+  };
+  
+  // Şarj geçmişini çek
+  const fetchChargingHistory = async () => {
+    setLoadingChargingHistory(true);
+    try {
+      const data = await chargingProviderService.getUserChargingHistory();
+      setChargingHistory(Array.isArray(data) ? data : (data.results || []));
+    } catch (error) {
+      console.error('Şarj geçmişi yüklenirken hata:', error);
+      setChargingHistory([]);
+    } finally {
+      setLoadingChargingHistory(false);
+    }
+  };
+  
+  const handleLogout = async () => {
+    Alert.alert(
+      "Çıkış Yap",
+      "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
+      [
+        {
+          text: "İptal",
+          style: "cancel"
+        },
+        {
+          text: "Çıkış Yap",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await authService.logout();
+              reset([{ name: 'Login' }]);
+            } catch (error) {
+              console.error('Logout Error:', error);
+              Alert.alert(
+                "Hata",
+                "Çıkış yapılırken bir hata oluştu. Lütfen tekrar deneyin.",
+                [{ text: "Tamam" }]
+              );
+            }
+          }
+        }
+      ]
+    );
+  };
+  
+  // Araç listesi görünümünde marka başlığı
+  const renderSectionHeader = ({section}) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionHeaderText}>{section.title}</Text>
+    </View>
   );
 
+  // Arama kutusunu temizleme
+  const clearSearch = () => {
+    setSearchQuery('');
+  };
+
+  // Tüm elektrikli araçları yeniden yükle
+  const handleRefreshCars = () => {
+    Alert.alert(
+      "Araçları Yenile", 
+      "Tüm araç listesini yeniden yüklemek istiyor musunuz? Bu işlem biraz zaman alabilir.",
+      [
+        { 
+          text: "İptal", 
+          style: "cancel" 
+        },
+        { 
+          text: "Yenile", 
+          onPress: fetchCars 
+        }
+      ]
+    );
+  };
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>API Bağlantı Testi</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a2234" />
       
-      <View style={styles.ipContainer}>
-        <Text style={styles.subtitle}>Sunucu IP Adresi:</Text>
-        <View style={styles.ipInputContainer}>
-          <TextInput
-            style={styles.ipInput}
-            value={ipAddress}
-            onChangeText={handleIpChange}
-            placeholder="Sunucu IP adresi (ör: 10.196.154.5)"
-            placeholderTextColor="#a0a9bc"
-          />
+      {/* Gelişmiş yükleme göstergesi */}
+      <LoadingScreen isVisible={loadingCars} message={loadingMessage} />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTitleContainer}>
           <TouchableOpacity 
-            style={styles.saveIpButton}
-            onPress={updateServerIp}
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
           >
-            <Ionicons name="save" size={20} color="#fff" />
+            <Ionicons name="arrow-back" size={24} color="#00b8d4" />
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>Kullanıcı Bilgileri</Text>
         </View>
-        <TouchableOpacity 
-          style={styles.ipSelectButton}
-          onPress={() => navigation.navigate('IpSelect')}
-        >
-          <Ionicons name="list" size={18} color="#fff" style={{ marginRight: 8 }} />
-          <Text style={styles.ipSelectButtonText}>Kayıtlı IP'lere Git</Text>
-        </TouchableOpacity>
       </View>
       
-      <Text style={styles.subtitle}>Test edilecek endpoint'i seçin:</Text>
-      
-      <ScrollView style={styles.endpointScrollView}>
-        {endpointGroups.map((group, groupIndex) => (
-          <View key={groupIndex} style={styles.endpointGroup}>
-            <Text style={styles.groupTitle}>{group.title}</Text>
-            <View style={styles.endpointButtonGrid}>
-              {group.items.map(endpoint => renderEndpointButton(endpoint))}
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.contentContainer}>
+          {/* Sol Taraf - Kullanıcı Bilgileri */}
+          <View style={styles.userInfoContainer}>
+            <Text style={styles.sectionTitle}>Kullanıcı Bilgileri</Text>
+            
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#00b8d4" />
+                <Text style={styles.loadingText}>Bilgiler yükleniyor...</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Kullanıcı Adı:</Text>
+                  <Text style={styles.infoValue}>{userInfo.username}</Text>
+                </View>
+                
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>E-posta:</Text>
+                  <Text style={styles.infoValue}>{userInfo.email}</Text>
+                </View>
+                
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Kayıt Tarihi:</Text>
+                  <Text style={styles.infoValue}>{userInfo.registrationDate}</Text>
+                </View>
+              </>
+            )}
+            
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Elektrikli Araç Seçimi</Text>
+              {!loadingCars && (
+                <TouchableOpacity onPress={handleRefreshCars}>
+                  <Ionicons name="refresh" size={20} color="#00b8d4" />
+                </TouchableOpacity>
+              )}
             </View>
+            
+            {loadingCars ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#00b8d4" />
+                <Text style={styles.loadingText}>{loadingMessage || 'Araçlar yükleniyor...'}</Text>
+              </View>
+            ) : (
+              <>
+                {/* Özel Araç Seçici */}
+                <TouchableOpacity 
+                  style={styles.customPickerContainer}
+                  onPress={() => setShowCarPicker(true)}
+                >
+                  <Text style={styles.customPickerText}>{selectedCar || 'Lütfen araç seçin'}</Text>
+                  <Ionicons name="chevron-down" size={20} color="#00b8d4" />
+                </TouchableOpacity>
+                
+                {carDetails && (
+                  <View style={styles.carInfoContainer}>
+                    <Text style={styles.carInfoTitle}>Seçili Araç:</Text>
+                    <Text style={styles.carInfoValue}>{selectedCar}</Text>
+                    
+                    <Text style={styles.carInfoTitle}>Ortalama Menzil:</Text>
+                    <Text style={styles.carInfoValue}>{carDetails.average_range} km</Text>
+                    
+                    <Text style={styles.carInfoTitle}>Batarya Kapasitesi:</Text>
+                    <Text style={styles.carInfoValue}>{carDetails.kwh} kWh</Text>
+                  </View>
+                )}
+              </>
+            )}
           </View>
-        ))}
+          
+          {/* Sağ Taraf - Rota Geçmişi */}
+          <View style={styles.routeHistoryContainer}>
+            {/* Sekmeli başlıklar */}
+            <View style={{ flexDirection: 'row', marginBottom: 16 }}>
+              <TouchableOpacity
+                style={[{
+                  flex: 1,
+                  paddingVertical: 10,
+                  alignItems: 'center',
+                  borderBottomWidth: 2,
+                  borderBottomColor: activeHistoryTab === 'route' ? '#00b8d4' : 'transparent',
+                  backgroundColor: activeHistoryTab === 'route' ? '#232b3e' : 'transparent',
+                  borderTopLeftRadius: 8,
+                  borderTopRightRadius: 0
+                }]}
+                onPress={() => setActiveHistoryTab('route')}
+              >
+                <Text style={{ color: activeHistoryTab === 'route' ? '#00b8d4' : '#a0a9bc', fontWeight: 'bold', fontSize: 16 }}>Rota Geçmişi</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[{
+                  flex: 1,
+                  paddingVertical: 10,
+                  alignItems: 'center',
+                  borderBottomWidth: 2,
+                  borderBottomColor: activeHistoryTab === 'charging' ? '#00b8d4' : 'transparent',
+                  backgroundColor: activeHistoryTab === 'charging' ? '#232b3e' : 'transparent',
+                  borderTopLeftRadius: 0,
+                  borderTopRightRadius: 8
+                }]}
+                onPress={() => setActiveHistoryTab('charging')}
+              >
+                <Text style={{ color: activeHistoryTab === 'charging' ? '#00b8d4' : '#a0a9bc', fontWeight: 'bold', fontSize: 16 }}>Şarj Geçmişi</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Aktif sekmeye göre içerik */}
+            {activeHistoryTab === 'route' ? (
+              // Rota Geçmişi
+              loadingRouteHistory ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#00b8d4" />
+                  <Text style={styles.loadingText}>Rota geçmişi yükleniyor...</Text>
+                </View>
+              ) : routeHistory.length > 0 ? (
+                routeHistory.map((route) => (
+                  <View key={route.id} style={styles.routeCard}>
+                    <Text style={styles.routeDate}>
+                      {route.created_at ? new Date(route.created_at).toLocaleString('tr-TR', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 'Tarih bilgisi yok'}
+                    </Text>
+                    
+                    <View style={styles.routeDetail}>
+                      <Text style={styles.routeLabel}>Başlangıç:</Text>
+                      <Text style={styles.routeValue}>{route.start_address || 'Başlangıç konumu yok'}</Text>
+                    </View>
+                    
+                    <View style={styles.routeDetail}>
+                      <Text style={styles.routeLabel}>Varış:</Text>
+                      <Text style={styles.routeValue}>{route.end_address || 'Varış konumu yok'}</Text>
+                    </View>
+                    
+                    <View style={styles.routeStats}>
+                      <Text style={styles.routeDistance}>
+                        {route.total_distance ? `${route.total_distance.toFixed(1)} km` : '0 km'}
+                      </Text>
+                      <Text style={styles.routeDuration}>
+                        {route.total_duration ? `${Math.round(route.total_duration)} dk` : '0 dk'}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyRouteHistory}>
+                  <Ionicons name="map-outline" size={32} color="#a0a9bc" />
+                  <Text style={styles.emptyListText}>Henüz rota geçmişi bulunmuyor.</Text>
+                </View>
+              )
+            ) : (
+              // Şarj Geçmişi
+              loadingChargingHistory ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#00b8d4" />
+                  <Text style={styles.loadingText}>Şarj geçmişi yükleniyor...</Text>
+                </View>
+              ) : chargingHistory.length > 0 ? (
+                chargingHistory.map((item) => (
+                  <View key={item.id} style={styles.routeCard}>
+                    <Text style={styles.routeDate}>
+                      {item.tarih ? new Date(item.tarih).toLocaleString('tr-TR', {
+                        year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+                      }) : 'Tarih bilgisi yok'}
+                    </Text>
+                    <View style={styles.routeDetail}>
+                      <Text style={styles.routeLabel}>Araç:</Text>
+                      <Text style={styles.routeValue}>{item.arac || '-'}</Text>
+                    </View>
+                    <View style={styles.routeDetail}>
+                      <Text style={styles.routeLabel}>Firma:</Text>
+                      <Text style={styles.routeValue}>{item.firma || '-'}</Text>
+                    </View>
+                    <View style={styles.routeDetail}>
+                      <Text style={styles.routeLabel}>Başlangıç Şarj:</Text>
+                      <Text style={styles.routeValue}>%{item.baslangic_sarj}</Text>
+                    </View>
+                    <View style={styles.routeDetail}>
+                      <Text style={styles.routeLabel}>Varış Şarj:</Text>
+                      <Text style={styles.routeValue}>%{item.varis_sarj}</Text>
+                    </View>
+                    <View style={styles.routeDetail}>
+                      <Text style={styles.routeLabel}>Doldurulan Enerji:</Text>
+                      <Text style={styles.routeValue}>{item.doldurulan_enerji} kWh</Text>
+                    </View>
+                    <View style={styles.routeDetail}>
+                      <Text style={styles.routeLabel}>Toplam Ücret:</Text>
+                      <Text style={styles.routeValue}>{item.toplam_ucret} TL</Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyRouteHistory}>
+                  <Ionicons name="flash-outline" size={32} color="#a0a9bc" />
+                  <Text style={styles.emptyListText}>Henüz şarj geçmişi bulunmuyor.</Text>
+                </View>
+              )
+            )}
+          </View>
+          
+          {/* Çıkış Yap butonu sayfanın en altına taşındı */}
+          <View style={[styles.logoutButtonContainer, {
+            width: '100%',
+            paddingHorizontal: 16,
+            marginTop: 20,
+            marginBottom: 10
+          }]}>
+            <TouchableOpacity style={[styles.actionButton, {
+              width: '100%',
+              borderRadius: 4,
+              height: 48,
+              backgroundColor: '#e53935'
+            }]} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={22} color="white" style={styles.buttonIcon} />
+              <Text style={[styles.buttonText, {fontSize: 16}]}>Çıkış Yap</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
       
-      {selectedEndpoint === 'yakin-sarj-istasyonlari' && (
-        <View style={styles.coordinatesContainer}>
-          <Text style={styles.subtitle}>Koordinatlar:</Text>
-          <View style={styles.inputRow}>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Enlem:</Text>
-              <TextInput
-                style={styles.input}
-                value={latitude}
-                onChangeText={setLatitude}
-                keyboardType="numeric"
-                placeholder="Enlem (ör: 41.0082)"
-                placeholderTextColor="#a0a9bc"
-              />
-            </View>
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Boylam:</Text>
-              <TextInput
-                style={styles.input}
-                value={longitude}
-                onChangeText={setLongitude}
-                keyboardType="numeric"
-                placeholder="Boylam (ör: 28.9784)"
-                placeholderTextColor="#a0a9bc"
-              />
-            </View>
-          </View>
-        </View>
-      )}
-      
-      <TouchableOpacity 
-        style={styles.button} 
-        onPress={testConnection}
-        disabled={loading}
+      {/* Araç Seçim Modalı - Geliştirilmiş */}
+      <Modal
+        visible={showCarPicker}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowCarPicker(false)}
       >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <>
-            <Ionicons name="send" size={20} color="#fff" style={{ marginRight: 10 }} />
-            <Text style={styles.buttonText}>Bağlantıyı Test Et</Text>
-          </>
-        )}
-      </TouchableOpacity>
-      
-      {error && (
-        <View style={styles.resultContainer}>
-          <Text style={styles.errorText}>Hata: {error}</Text>
-          <Text style={styles.tip}>
-            İpucu: Django sunucusunun çalıştığından ve IP adresinin doğru olduğundan emin olun.
-            Test edilen URL: http://{ipAddress}:8000/api/v1/{selectedEndpoint}/
-            {selectedEndpoint === 'yakin-sarj-istasyonlari' ? `?lat=${latitude}&lng=${longitude}` : ''}
-          </Text>
-        </View>
-      )}
-      
-      {result && (
-        <ScrollView style={styles.resultContainer}>
-          <View style={styles.resultHeader}>
-            <Text style={styles.successText}>Bağlantı başarılı!</Text>
-            <View style={styles.endpointInfo}>
-              <Text style={styles.endpointInfoLabel}>Endpoint:</Text>
-              <View style={styles.selectedEndpointBadge}>
-                <Ionicons 
-                  name={getIconForEndpoint(selectedEndpoint)} 
-                  size={16} 
-                  color="#fff" 
-                  style={{ marginRight: 5 }}
-                />
-                <Text style={styles.endpointValue}>{selectedEndpoint}</Text>
-              </View>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Araç Seçin ({cars.length} araç)</Text>
+              <TouchableOpacity onPress={() => setShowCarPicker(false)}>
+                <Ionicons name="close" size={24} color="#00b8d4" />
+              </TouchableOpacity>
             </View>
+            
+            {/* Arama Kutusu */}
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={20} color="#a0a9bc" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Marka veya model ara..."
+                placeholderTextColor="#a0a9bc"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={clearSearch}>
+                  <Ionicons name="close-circle" size={20} color="#a0a9bc" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            
+            {/* Araç Sayısı Bilgisi */}
+            <View style={styles.resultsInfo}>
+              <Text style={styles.resultsInfoText}>
+                {searchQuery 
+                  ? `${filteredCars.length} araç bulundu`
+                  : `Toplam ${cars.length} araç`}
+              </Text>
+            </View>
+            
+            {loadingCars ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#00b8d4" />
+                <Text style={styles.loadingText}>{loadingMessage || 'Araçlar yükleniyor...'}</Text>
+              </View>
+            ) : filteredCars.length > 0 ? (
+              <SectionList
+                sections={groupedCars}
+                keyExtractor={(item) => item.id.toString()}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={[
+                      styles.carListItem, 
+                      selectedCar === item.car_name && styles.selectedCarItem
+                    ]}
+                    onPress={() => handleCarSelect(item)}
+                  >
+                    <Text style={[
+                      styles.carListItemText,
+                      selectedCar === item.car_name && styles.selectedCarItemText
+                    ]}>
+                      {item.car_name}
+                    </Text>
+                    {selectedCar === item.car_name && (
+                      <Ionicons name="checkmark" size={20} color="#00b8d4" />
+                    )}
+                  </TouchableOpacity>
+                )}
+                renderSectionHeader={renderSectionHeader}
+                stickySectionHeadersEnabled={true}
+                initialNumToRender={20}
+                maxToRenderPerBatch={20}
+                windowSize={10}
+                ListEmptyComponent={() => (
+                  <View style={styles.emptyList}>
+                    <Ionicons name="car-outline" size={48} color="#a0a9bc" />
+                    <Text style={styles.emptyListText}>
+                      Arama sonucunda araç bulunamadı.
+                    </Text>
+                  </View>
+                )}
+              />
+            ) : (
+              <View style={styles.emptyList}>
+                <Ionicons name="car-outline" size={48} color="#a0a9bc" />
+                <Text style={styles.emptyListText}>
+                  Hiç araç bulunamadı. Lütfen daha sonra tekrar deneyin.
+                </Text>
+              </View>
+            )}
           </View>
-          <Text style={styles.jsonText}>
-            {JSON.stringify(result, null, 2)}
-          </Text>
-        </ScrollView>
-      )}
-    </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#1a2234',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
+  header: {
+    backgroundColor: '#1a2234',
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2d3446',
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    padding: 5,
+    marginRight: 10,
+  },
+  headerTitle: {
     color: '#00b8d4',
-  },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 10,
-    color: '#ffffff',
-  },
-  ipContainer: {
-    backgroundColor: '#2d3446',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
-  ipInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  ipInput: {
-    flex: 1,
-    backgroundColor: '#3d4559',
-    borderRadius: 5,
-    padding: 10,
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#4d5569',
-  },
-  saveIpButton: {
-    backgroundColor: '#00b8d4',
-    padding: 10,
-    borderRadius: 5,
-    marginLeft: 10,
-  },
-  ipSelectButton: {
-    flexDirection: 'row',
-    backgroundColor: '#3d4559',
-    padding: 8,
-    borderRadius: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ipSelectButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-  },
-  endpointScrollView: {
-    maxHeight: 250,
-    marginBottom: 15,
-  },
-  endpointGroup: {
-    marginBottom: 15,
-  },
-  groupTitle: {
-    fontSize: 14,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#a0a9bc',
-    marginBottom: 10,
-    paddingHorizontal: 5,
   },
-  endpointButtonGrid: {
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    padding: 16,
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  endpointButton: {
-    backgroundColor: '#2d3446',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    margin: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#3d4559',
-    minWidth: 130,
-    maxWidth: 170,
-  },
-  selectedEndpoint: {
-    backgroundColor: '#00b8d4',
-    borderColor: '#00b8d4',
-  },
-  endpointIcon: {
-    marginRight: 5,
-  },
-  endpointText: {
-    color: '#ffffff',
-    fontSize: 14,
+  userInfoContainer: {
     flex: 1,
-  },
-  selectedEndpointText: {
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  button: {
-    backgroundColor: '#00b8d4',
-    padding: 15,
+    minWidth: 300,
+    backgroundColor: '#1a2234',
     borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    marginRight: 16,
+  },
+  routeHistoryContainer: {
+    flex: 1,
+    minWidth: 300,
+    backgroundColor: '#1a2234',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#00b8d4',
+    marginBottom: 16,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  infoLabel: {
+    width: 100,
+    fontSize: 14,
+    color: '#a0a9bc',
+  },
+  infoValue: {
+    flex: 1,
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '500',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    color: '#a0a9bc',
+    marginTop: 10,
+  },
+  carInfoContainer: {
+    backgroundColor: '#2d3446',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  carInfoTitle: {
+    fontSize: 14,
+    color: '#a0a9bc',
+    marginBottom: 4,
+  },
+  carInfoValue: {
+    fontSize: 16,
+    color: '#ffffff',
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  actionButton: {
+    backgroundColor: '#00b8d4',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
-    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 8,
+    width: '50%',
+  },
+  buttonIcon: {
+    marginRight: 8,
   },
   buttonText: {
-    color: 'white',
+    color: '#ffffff',
     fontWeight: 'bold',
     fontSize: 16,
   },
-  resultContainer: {
+  routeCard: {
     backgroundColor: '#2d3446',
-    padding: 15,
     borderRadius: 8,
-    marginTop: 10,
-    flex: 1,
+    padding: 16,
+    marginBottom: 12,
   },
-  resultHeader: {
-    marginBottom: 15,
-  },
-  successText: {
-    color: '#4caf50',
-    fontSize: 18,
+  routeDate: {
+    fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#00b8d4',
+    marginBottom: 12,
   },
-  errorText: {
-    color: '#f44336',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+  routeDetail: {
+    marginBottom: 8,
   },
-  jsonText: {
-    fontFamily: 'monospace',
-    color: '#ffffff',
-    fontSize: 13,
-  },
-  tip: {
-    marginTop: 10,
-    fontStyle: 'italic',
+  routeLabel: {
+    fontSize: 14,
     color: '#a0a9bc',
+    marginBottom: 2,
   },
-  endpointInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  endpointInfoLabel: {
-    color: '#a0a9bc',
-    marginRight: 10,
-  },
-  endpointValue: {
+  routeValue: {
+    fontSize: 14,
     color: '#ffffff',
-    fontWeight: 'bold',
   },
-  selectedEndpointBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#00b8d4',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-  },
-  coordinatesContainer: {
-    backgroundColor: '#2d3446',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
-  inputRow: {
+  routeStats: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 12,
   },
-  inputContainer: {
-    flex: 1,
-    marginHorizontal: 5,
+  routeDistance: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#00b8d4',
   },
-  inputLabel: {
-    color: '#ffffff',
-    marginBottom: 5,
+  routeDuration: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#00b8d4',
   },
-  input: {
-    backgroundColor: '#3d4559',
-    borderRadius: 5,
-    padding: 10,
-    color: '#ffffff',
+  // Özel Picker Stilleri
+  customPickerContainer: {
+    backgroundColor: '#2d3446',
     borderWidth: 1,
-    borderColor: '#4d5569',
-  }
+    borderColor: '#3d4559',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  customPickerText: {
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  
+  // Modal Stilleri
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#1a2234',
+    borderRadius: 8,
+    width: '90%',
+    maxHeight: '70%',
+    borderWidth: 1,
+    borderColor: '#3d4559',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3d4559',
+  },
+  modalTitle: {
+    color: '#00b8d4',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  carListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3d4559',
+  },
+  selectedCarItem: {
+    backgroundColor: '#2d3446',
+  },
+  carListItemText: {
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  selectedCarItemText: {
+    color: '#00b8d4',
+    fontWeight: 'bold',
+  },
+  // Arama Kutusu
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2d3446',
+    borderRadius: 8,
+    margin: 10,
+    paddingHorizontal: 12,
+    height: 48,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 16,
+  },
+  // Section Header
+  sectionHeader: {
+    backgroundColor: '#0f1521',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#3d4559',
+  },
+  sectionHeaderText: {
+    color: '#00b8d4',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  // Sonuç Bilgisi
+  resultsInfo: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#1a2234',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3d4559',
+  },
+  resultsInfoText: {
+    color: '#a0a9bc',
+    fontSize: 14,
+  },
+  // Boş Liste
+  emptyList: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyListText: {
+    color: '#a0a9bc',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  // Yeni stiller
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(26, 34, 52, 0.8)',
+    zIndex: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  emptyRouteHistory: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
 });
 
-export default TestScreen;
+export default UserProfileScreen;

@@ -23,6 +23,10 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "API_URL": "https://senin-api-urlin.com",
+      "GOOGLE_MAPS_KEY": "AIzaSyBHa801MTJF47o8YRujKKBX2-rOBdSu5HQ"
     }
   }
 }
