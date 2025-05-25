@@ -268,20 +268,16 @@ const HistoryCard = ({ item, type, index }) => {
 }
 
 const UserProfileScreen = ({ navigation }) => {
-  const [selectedCar, setSelectedCar] = useState("TOGG T10X V1 RWD Uzun Menzil")
-  const [showCarPicker, setShowCarPicker] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [loadingCars, setLoadingCars] = useState(true)
-  const [loadingMessage, setLoadingMessage] = useState("Araçlar yükleniyor...")
-  const [cars, setCars] = useState([])
-  const [carDetails, setCarDetails] = useState(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [routeHistory, setRouteHistory] = useState([])
-  const [loadingRouteHistory, setLoadingRouteHistory] = useState(false)
-  const [activeHistoryTab, setActiveHistoryTab] = useState("route")
-  const [chargingHistory, setChargingHistory] = useState([])
-  const [loadingChargingHistory, setLoadingChargingHistory] = useState(false)
-
+  const [selectedCar, setSelectedCar] = useState('TOGG T10X V1 RWD Uzun Menzil');
+  const [showCarPicker, setShowCarPicker] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingCars, setLoadingCars] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('Araçlar yükleniyor...');
+  const [cars, setCars] = useState([]);
+  const [carDetails, setCarDetails] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Kullanıcı bilgileri için state tanımla
   const [userInfo, setUserInfo] = useState({
     username: "",
     email: "",
@@ -360,11 +356,25 @@ const UserProfileScreen = ({ navigation }) => {
 
       return {
         title: brand,
-        data: carsInBrand,
+        data: carsInBrand
+      };
+    });
+  }, [filteredCars]);
+  
+  // Araçları önce yükle, sonra kullanıcı bilgilerini getir
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        await fetchCars();
+        await fetchUserInfo();
+      } catch (error) {
+        console.error('Veri yükleme hatası:', error);
       }
-    })
-  }, [filteredCars])
-
+    };
+    
+    loadData();
+  }, []);
+  
   const fetchUserInfo = async () => {
     setLoading(true)
     try {
@@ -520,7 +530,7 @@ const UserProfileScreen = ({ navigation }) => {
         }
       }
     } catch (error) {
-      console.error("Araç detayları yüklenirken hata:", error)
+      console.error('Araç detayları yüklenirken hata:', error);
     }
   }
 
@@ -549,38 +559,36 @@ const UserProfileScreen = ({ navigation }) => {
       setLoadingCars(false)
       setLoadingMessage("")
     }
-  }
-
-  const fetchRouteHistory = async () => {
-    setLoadingRouteHistory(true)
-    try {
-      const routeHistoryData = await userService.getRouteHistory()
-      if (routeHistoryData && routeHistoryData.length > 0) {
-        setRouteHistory(routeHistoryData)
-      } else {
-        setRouteHistory([])
-      }
-    } catch (error) {
-      console.error("Rota geçmişi yüklenirken hata:", error)
-      setRouteHistory([])
-    } finally {
-      setLoadingRouteHistory(false)
+  };
+  
+  // Örnek rota geçmişi
+  const routeHistory = [
+    {
+      id: 1,
+      date: '22/03/2023 13:52',
+      startLocation: 'İstanbul, Türkiye',
+      endLocation: 'Taşköprü Yeni İzmit Yalova Yolu NO:67/A, 77602 Taşköprü/Çiftlikköy/Yalova, Türkiye',
+      distance: '83.0 km',
+      duration: '82 dk'
+    },
+    {
+      id: 2,
+      date: '15/03/2023 14:30',
+      startLocation: 'Yenibosna Merkez, Bahçelievler/İstanbul, Türkiye',
+      endLocation: 'Ömerlı, 34799 Çekmeköy/İstanbul, Türkiye',
+      distance: '80.9 km',
+      duration: '66 dk'
+    },
+    {
+      id: 3,
+      date: '15/03/2023 14:27',
+      startLocation: 'Yenibosna Merkez, Bahçelievler/İstanbul, Türkiye',
+      endLocation: 'Beykoz/İstanbul, Türkiye',
+      distance: '60.6 km',
+      duration: '54 dk'
     }
-  }
-
-  const fetchChargingHistory = async () => {
-    setLoadingChargingHistory(true)
-    try {
-      const data = await chargingProviderService.getUserChargingHistory()
-      setChargingHistory(Array.isArray(data) ? data : data.results || [])
-    } catch (error) {
-      console.error("Şarj geçmişi yüklenirken hata:", error)
-      setChargingHistory([])
-    } finally {
-      setLoadingChargingHistory(false)
-    }
-  }
-
+  ];
+  
   const handleLogout = async () => {
     Alert.alert("Çıkış Yap", "Hesabınızdan çıkış yapmak istediğinize emin misiniz?", [
       {
@@ -641,218 +649,138 @@ const UserProfileScreen = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor="#1a2234" />
 
       <LoadingScreen isVisible={loadingCars} message={loadingMessage} />
-
-      {/* Enhanced Header */}
-      <Animated.View style={[styles.header, { transform: [{ translateY: headerAnim }] }]}>
-        <LinearGradient
-          colors={["rgba(0, 184, 212, 0.15)", "rgba(0, 184, 212, 0.05)", "transparent"]}
-          style={styles.headerGradient}
-        >
-          <View style={styles.headerContent}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <View style={styles.backButtonContainer}>
-                <Ionicons name="arrow-back" size={24} color="#00b8d4" />
+      
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTitleContainer}>
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#00b8d4" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Kullanıcı Bilgileri</Text>
+        </View>
+      </View>
+      
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.contentContainer}>
+          {/* Sol Taraf - Kullanıcı Bilgileri */}
+          <View style={styles.userInfoContainer}>
+            <Text style={styles.sectionTitle}>Kullanıcı Bilgileri</Text>
+            
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#00b8d4" />
+                <Text style={styles.loadingText}>Bilgiler yükleniyor...</Text>
               </View>
-            </TouchableOpacity>
-            <View style={styles.headerTitleContainer}>
-              <Ionicons name="person-circle" size={28} color="#00b8d4" style={styles.headerIcon} />
-              <Text style={styles.headerTitle}>Kullanıcı Bilgileri</Text>
+            ) : (
+              <>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Kullanıcı Adı:</Text>
+                  <Text style={styles.infoValue}>{userInfo.username}</Text>
+                </View>
+                
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>E-posta:</Text>
+                  <Text style={styles.infoValue}>{userInfo.email}</Text>
+                </View>
+                
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Kayıt Tarihi:</Text>
+                  <Text style={styles.infoValue}>{userInfo.registrationDate}</Text>
+                </View>
+              </>
+            )}
+            
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Elektrikli Araç Seçimi</Text>
+              {!loadingCars && (
+                <TouchableOpacity onPress={handleRefreshCars}>
+                  <Ionicons name="refresh" size={20} color="#00b8d4" />
+                </TouchableOpacity>
+              )}
             </View>
-            <TouchableOpacity onPress={handleRefreshCars} style={styles.refreshButton}>
-              <Ionicons name="refresh" size={24} color="#00b8d4" />
+            
+            {loadingCars ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#00b8d4" />
+                <Text style={styles.loadingText}>{loadingMessage || 'Araçlar yükleniyor...'}</Text>
+              </View>
+            ) : (
+              <>
+                {/* Özel Araç Seçici */}
+                <TouchableOpacity 
+                  style={styles.customPickerContainer}
+                  onPress={() => setShowCarPicker(true)}
+                >
+                  <Text style={styles.customPickerText}>{selectedCar || 'Lütfen araç seçin'}</Text>
+                  <Ionicons name="chevron-down" size={20} color="#00b8d4" />
+                </TouchableOpacity>
+                
+                {carDetails && (
+                  <View style={styles.carInfoContainer}>
+                    <Text style={styles.carInfoTitle}>Seçili Araç:</Text>
+                    <Text style={styles.carInfoValue}>{selectedCar}</Text>
+                    
+                    <Text style={styles.carInfoTitle}>Ortalama Menzil:</Text>
+                    <Text style={styles.carInfoValue}>{carDetails.average_range} km</Text>
+                    
+                    <Text style={styles.carInfoTitle}>Batarya Kapasitesi:</Text>
+                    <Text style={styles.carInfoValue}>{carDetails.kwh} kWh</Text>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+          
+          {/* Sağ Taraf - Rota Geçmişi */}
+          <View style={styles.routeHistoryContainer}>
+            <Text style={styles.sectionTitle}>Rota Geçmişi</Text>
+            
+            {routeHistory.map((route) => (
+              <View key={route.id} style={styles.routeCard}>
+                <Text style={styles.routeDate}>{route.date}</Text>
+                
+                <View style={styles.routeDetail}>
+                  <Text style={styles.routeLabel}>Başlangıç:</Text>
+                  <Text style={styles.routeValue}>{route.startLocation}</Text>
+                </View>
+                
+                <View style={styles.routeDetail}>
+                  <Text style={styles.routeLabel}>Varış:</Text>
+                  <Text style={styles.routeValue}>{route.endLocation}</Text>
+                </View>
+                
+                <View style={styles.routeStats}>
+                  <Text style={styles.routeDistance}>{route.distance}</Text>
+                  <Text style={styles.routeDuration}>{route.duration}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+          
+          {/* Çıkış Yap butonu sayfanın en altına taşındı */}
+          <View style={[styles.logoutButtonContainer, {
+            width: '100%',
+            paddingHorizontal: 16,
+            marginTop: 20,
+            marginBottom: 10
+          }]}>
+            <TouchableOpacity style={[styles.actionButton, {
+              width: '100%',
+              borderRadius: 4,
+              height: 48,
+              backgroundColor: '#e53935'
+            }]} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={22} color="white" style={styles.buttonIcon} />
+              <Text style={[styles.buttonText, {fontSize: 16}]}>Çıkış Yap</Text>
             </TouchableOpacity>
           </View>
-        </LinearGradient>
-      </Animated.View>
-
-      <Animated.View style={[styles.scrollContainer, { opacity: contentAnim }]}>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          <View style={styles.contentContainer}>
-            {/* User Information Section */}
-            <AnimatedCard delay={200} style={styles.userInfoContainer}>
-              <LinearGradient
-                colors={["rgba(0, 184, 212, 0.1)", "rgba(0, 184, 212, 0.05)"]}
-                style={styles.sectionGradient}
-              >
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionIconContainer}>
-                    <Ionicons name="person" size={24} color="#00b8d4" />
-                  </View>
-                  <Text style={styles.sectionTitle}>Kullanıcı Bilgileri</Text>
-                </View>
-
-                {loading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#00b8d4" />
-                    <Text style={styles.loadingText}>Bilgiler yükleniyor...</Text>
-                  </View>
-                ) : (
-                  <View style={styles.userInfoContent}>
-                    <InfoRow icon="person-outline" label="Kullanıcı Adı" value={userInfo.username} delay={300} />
-                    <InfoRow icon="mail-outline" label="E-posta" value={userInfo.email} delay={400} />
-                    <InfoRow
-                      icon="calendar-outline"
-                      label="Kayıt Tarihi"
-                      value={userInfo.registrationDate}
-                      delay={500}
-                    />
-                  </View>
-                )}
-              </LinearGradient>
-            </AnimatedCard>
-
-            {/* Car Selection Section */}
-            <AnimatedCard delay={400} style={styles.carSelectionContainer}>
-              <LinearGradient
-                colors={["rgba(0, 184, 212, 0.1)", "rgba(0, 184, 212, 0.05)"]}
-                style={styles.sectionGradient}
-              >
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionIconContainer}>
-                    <FontAwesome5 name="car" size={20} color="#00b8d4" />
-                  </View>
-                  <Text style={styles.sectionTitle}>Elektrikli Araç Seçimi</Text>
-                </View>
-
-                {loadingCars ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator size="small" color="#00b8d4" />
-                    <Text style={styles.loadingText}>{loadingMessage}</Text>
-                  </View>
-                ) : (
-                  <View style={styles.carSelectionContent}>
-                    <TouchableOpacity style={styles.enhancedCarPicker} onPress={openCarPickerModal}>
-                      <LinearGradient
-                        colors={["rgba(0, 184, 212, 0.2)", "rgba(0, 184, 212, 0.1)"]}
-                        style={styles.carPickerGradient}
-                      >
-                        <View style={styles.carPickerContent}>
-                          <View style={styles.carPickerIcon}>
-                            <FontAwesome5 name="car-side" size={20} color="#00b8d4" />
-                          </View>
-                          <Text style={styles.carPickerText}>{selectedCar || "Lütfen araç seçin"}</Text>
-                          <Ionicons name="chevron-down" size={20} color="#00b8d4" />
-                        </View>
-                      </LinearGradient>
-                    </TouchableOpacity>
-
-                    {carDetails && (
-                      <AnimatedCard delay={600} style={styles.carDetailsContainer}>
-                        <View style={styles.carDetailsHeader}>
-                          <Ionicons name="information-circle" size={20} color="#00b8d4" />
-                          <Text style={styles.carDetailsTitle}>Araç Detayları</Text>
-                        </View>
-                        <View style={styles.carDetailsContent}>
-                          <View style={styles.carDetailRow}>
-                            <View style={styles.carDetailIcon}>
-                              <Ionicons name="speedometer" size={18} color="#00b8d4" />
-                            </View>
-                            <View style={styles.carDetailInfo}>
-                              <Text style={styles.carDetailLabel}>Ortalama Menzil</Text>
-                              <Text style={styles.carDetailValue}>{carDetails.average_range} km</Text>
-                            </View>
-                          </View>
-                          <View style={styles.carDetailRow}>
-                            <View style={styles.carDetailIcon}>
-                              <Ionicons name="battery-full" size={18} color="#00b8d4" />
-                            </View>
-                            <View style={styles.carDetailInfo}>
-                              <Text style={styles.carDetailLabel}>Batarya Kapasitesi</Text>
-                              <Text style={styles.carDetailValue}>{carDetails.kwh} kWh</Text>
-                            </View>
-                          </View>
-                        </View>
-                      </AnimatedCard>
-                    )}
-                  </View>
-                )}
-              </LinearGradient>
-            </AnimatedCard>
-
-            {/* History Section */}
-            <AnimatedCard delay={600} style={styles.historyContainer}>
-              <LinearGradient
-                colors={["rgba(0, 184, 212, 0.1)", "rgba(0, 184, 212, 0.05)"]}
-                style={styles.sectionGradient}
-              >
-                <View style={styles.historyHeader}>
-                  <TouchableOpacity
-                    style={[styles.historyTab, activeHistoryTab === "route" && styles.activeHistoryTab]}
-                    onPress={() => setActiveHistoryTab("route")}
-                  >
-                    <Ionicons name="map" size={20} color={activeHistoryTab === "route" ? "#00b8d4" : "#a0a9bc"} />
-                    <Text style={[styles.historyTabText, activeHistoryTab === "route" && styles.activeHistoryTabText]}>
-                      Rota Geçmişi
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.historyTab, activeHistoryTab === "charging" && styles.activeHistoryTab]}
-                    onPress={() => setActiveHistoryTab("charging")}
-                  >
-                    <Ionicons name="flash" size={20} color={activeHistoryTab === "charging" ? "#00b8d4" : "#a0a9bc"} />
-                    <Text
-                      style={[styles.historyTabText, activeHistoryTab === "charging" && styles.activeHistoryTabText]}
-                    >
-                      Şarj Geçmişi
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.historyContent}>
-                  {activeHistoryTab === "route" ? (
-                    loadingRouteHistory ? (
-                      <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color="#00b8d4" />
-                        <Text style={styles.loadingText}>Rota geçmişi yükleniyor...</Text>
-                      </View>
-                    ) : routeHistory.length > 0 ? (
-                      routeHistory.map((route, index) => (
-                        <HistoryCard key={route.id} item={route} type="route" index={index} />
-                      ))
-                    ) : (
-                      <View style={styles.emptyState}>
-                        <Ionicons name="map-outline" size={48} color="#a0a9bc" />
-                        <Text style={styles.emptyStateText}>Henüz rota geçmişi bulunmuyor</Text>
-                        <Text style={styles.emptyStateSubtext}>
-                          İlk rotanızı oluşturmak için harita sayfasını ziyaret edin
-                        </Text>
-                      </View>
-                    )
-                  ) : loadingChargingHistory ? (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="small" color="#00b8d4" />
-                      <Text style={styles.loadingText}>Şarj geçmişi yükleniyor...</Text>
-                    </View>
-                  ) : chargingHistory.length > 0 ? (
-                    chargingHistory.map((item, index) => (
-                      <HistoryCard key={item.id} item={item} type="charging" index={index} />
-                    ))
-                  ) : (
-                    <View style={styles.emptyState}>
-                      <Ionicons name="flash-outline" size={48} color="#a0a9bc" />
-                      <Text style={styles.emptyStateText}>Henüz şarj geçmişi bulunmuyor</Text>
-                      <Text style={styles.emptyStateSubtext}>İlk şarj işleminizi gerçekleştirin</Text>
-                    </View>
-                  )}
-                </View>
-              </LinearGradient>
-            </AnimatedCard>
-
-            {/* Logout Button */}
-            <AnimatedCard delay={800} style={styles.logoutContainer}>
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <LinearGradient colors={["#e53935", "#c62828"]} style={styles.logoutGradient}>
-                  <Ionicons name="log-out-outline" size={24} color="white" />
-                  <Text style={styles.logoutText}>Çıkış Yap</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </AnimatedCard>
-          </View>
-        </ScrollView>
-      </Animated.View>
-
-      {/* Enhanced Car Selection Modal */}
+        </View>
+      </ScrollView>
+      
+      {/* Araç Seçim Modalı - Geliştirilmiş */}
       <Modal
         visible={showCarPicker}
         transparent={true}
@@ -1648,6 +1576,6 @@ const styles = StyleSheet.create({
   carList: {
     flex: 1,
   },
-})
+});
 
 export default UserProfileScreen
