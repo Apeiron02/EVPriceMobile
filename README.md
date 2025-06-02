@@ -45,10 +45,6 @@
   </tr>
   <tr>
     <td align="center">
-      <strong>Rota Bilgisi Sayfası</strong><br/>
-      <img src="image/Rota_Bilgisi_Sayfası.jpg" width="300"/>
-    </td>
-    <td align="center">
       <strong>Harita Sayfası - 4</strong><br/>
       <img src="image/Harita_Sayfası_4.jpg" width="300"/>
     </td>
@@ -56,12 +52,12 @@
       <strong>Harita Sayfası - 5</strong><br/>
       <img src="image/Harita_Sayfası_5.jpg" width="300"/>
     </td>
-  </tr>
-  <tr>
-      <td align="center">
+    <td align="center">
       <strong>Harita Sayfası - 6</strong><br/>
       <img src="image/Harita_Sayfası_6.jpg" width="300"/>
     </td>
+  </tr>
+  <tr>
       <td align="center">
       <strong>Harita Sayfası - 7</strong><br/>
       <img src="image/Harita_Sayfası_7.jpg" width="300"/>
@@ -69,6 +65,10 @@
       <td align="center">
       <strong>Rota Detayları Sayfası</strong><br/>
       <img src="image/Rota_Detayları_Sayfası.jpg" width="300"/>
+    </td>
+      <td align="center">
+      <strong>Rota Bilgisi Sayfası</strong><br/>
+      <img src="image/Rota_Bilgisi_Sayfası.jpg" width="300"/>
     </td>
   </tr>
   <tr>
