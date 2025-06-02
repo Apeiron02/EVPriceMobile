@@ -66,15 +66,15 @@
       <strong>Harita Sayfası - 7</strong><br/>
       <img src="image/Harita_Sayfası_7.jpg" width="300"/>
     </td>
-    <td align="center">
-      <strong>Kullanıcı Sayfası - 1</strong><br/>
-      <img src="image/Kullanıcı_Sayfası_1.jpg" width="300"/>
+      <td align="center">
+      <strong>Rota Detayları Sayfası</strong><br/>
+      <img src="image/Rota_Detayları_Sayfası.jpg" width="300"/>
     </td>
   </tr>
   <tr>
       <td align="center">
-      <strong>Rota Detayları Sayfası</strong><br/>
-      <img src="image/Rota_Detayları_Sayfası.jpg" width="300"/>
+      <strong>Kullanıcı Sayfası - 1</strong><br/>
+      <img src="image/Kullanıcı_Sayfası_1.jpg" width="300"/>
     </td>
      <td align="center">
       <strong>Kullanıcı Sayfası - 2</strong><br/>
