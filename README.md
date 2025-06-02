@@ -26,7 +26,7 @@
     </td>
     <td align="center">
       <strong>Şarj Maliyet Sayfası - 3</strong><br/>
-      <img src="image/Sarj_Maliyet_Sayfası_3.jpg" width="300"/>
+      <img src="image/Sarj_Maliyet_Sayfası_3.1.jpg" width="300"/>
     </td>
   </tr>
   <tr>
