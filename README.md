@@ -28,7 +28,7 @@ EVPriceMobile, elektrikli araç sahipleri için tasarlanmış kapsamlı bir mobi
 - Kişiselleştirilmiş profil
 - Araç bilgileri yönetimi
 - Geçmiş rotalar
-- Favori istasyonlar
+- Geçmişte yapılan şarj bilgileri
 
 ## 📱 Ekran Görüntüleri
 
@@ -144,16 +144,12 @@ npm install
 
 3. Gerekli API anahtarlarını ayarlayın:
 - Google Maps API anahtarı
-- Şarj istasyonu API anahtarları
 
 4. Uygulamayı başlatın:
 ```bash
 npm start
 ```
 
-## 📝 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
 
 ## 🤝 Katkıda Bulunma
 
