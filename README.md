@@ -1,4 +1,36 @@
-# EVPriceMobile
+# EVPriceMobile - Elektrikli Araç Yol Arkadaşı
+
+EVPriceMobile, elektrikli araç sahipleri için tasarlanmış kapsamlı bir mobil uygulamadır. Uygulama, elektrikli araç kullanıcılarının yolculuklarını planlamalarına, şarj istasyonlarını bulmalarına ve maliyetleri hesaplamalarına yardımcı olur.
+
+## 🌟 Özellikler
+
+### 🗺️ Akıllı Rota Planlama
+- Gerçek zamanlı rota optimizasyonu
+- Şarj istasyonları entegrasyonu
+- Dinlenme noktaları önerileri
+- Şehirler arası geçiş bilgileri
+- Rota üzerindeki şehirlerin otomatik tespiti
+
+### 🔌 Şarj İstasyonu Yönetimi
+- Yakındaki şarj istasyonlarını görüntüleme
+- İstasyon doluluk oranları
+- Şarj maliyeti hesaplama
+- İstasyon detayları ve yönlendirme
+- Rota üzerindeki şarj noktalarını planlama
+
+### 💰 Maliyet Hesaplama
+- Detaylı şarj maliyeti analizi
+- Farklı şarj sağlayıcıları karşılaştırma
+- Rota bazlı toplam maliyet hesaplama
+- Dinlenme noktaları maliyetleri
+
+### 👤 Kullanıcı Yönetimi
+- Kişiselleştirilmiş profil
+- Araç bilgileri yönetimi
+- Geçmiş rotalar
+- Favori istasyonlar
+
+## 📱 Ekran Görüntüleri
 
 <table>
   <tr>
@@ -84,6 +116,49 @@
       <strong>Kullanıcı Sayfası - 3</strong><br/>
       <img src="image/Kullanıcı_Sayfası_3.jpg" width="300"/>
     </td>
-  <tr>
   </tr>
 </table>
+
+## 🛠️ Teknik Özellikler
+
+- React Native ile geliştirilmiş cross-platform mobil uygulama
+- Google Maps API entegrasyonu
+- Gerçek zamanlı konum takibi
+- RESTful API entegrasyonu
+- Offline çalışma desteği
+- Animasyonlu kullanıcı arayüzü
+- Responsive tasarım
+
+## 🔧 Kurulum
+
+1. Projeyi klonlayın:
+```bash
+git clone https://github.com/yourusername/EVPriceMobile.git
+```
+
+2. Bağımlılıkları yükleyin:
+```bash
+cd EVPriceMobile
+npm install
+```
+
+3. Gerekli API anahtarlarını ayarlayın:
+- Google Maps API anahtarı
+- Şarj istasyonu API anahtarları
+
+4. Uygulamayı başlatın:
+```bash
+npm start
+```
+
+## 📝 Lisans
+
+Bu proje MIT lisansı altında lisanslanmıştır. Detaylar için [LICENSE](LICENSE) dosyasına bakın.
+
+## 🤝 Katkıda Bulunma
+
+1. Bu depoyu fork edin
+2. Yeni bir özellik dalı oluşturun (`git checkout -b feature/amazing-feature`)
+3. Değişikliklerinizi commit edin (`git commit -m 'Add some amazing feature'`)
+4. Dalınıza push edin (`git push origin feature/amazing-feature`)
+5. Bir Pull Request oluşturun
